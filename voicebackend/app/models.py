@@ -1,7 +1,17 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, String, Text, create_engine, inspect, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    create_engine,
+    inspect,
+    text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 
 from app.config import get_settings
@@ -28,6 +38,8 @@ class CatalogueRecord(Base):
     audio_used: Mapped[bool] = mapped_column(default=False)
     asr_provider: Mapped[str | None] = mapped_column(String(100))
     translation_provider: Mapped[str | None] = mapped_column(String(100))
+    translation_pending: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    requested_output_languages: Mapped[list | None] = mapped_column(JSON)
     warnings: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
@@ -78,6 +90,16 @@ def migrate_provider_columns(target_engine) -> None:
                     "UPDATE catalogues SET translation_provider = 'Bhashini' "
                     "WHERE translation_provider IS NULL"
                 )
+            )
+        if "translation_pending" not in columns:
+            connection.execute(
+                text(
+                    "ALTER TABLE catalogues ADD COLUMN translation_pending BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+            )
+        if "requested_output_languages" not in columns:
+            connection.execute(
+                text("ALTER TABLE catalogues ADD COLUMN requested_output_languages JSON")
             )
 
 

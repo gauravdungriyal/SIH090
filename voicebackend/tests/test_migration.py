@@ -15,13 +15,21 @@ def test_existing_catalogues_keep_bhashini_provider_attribution():
     migrate_provider_columns(engine)
     migrate_provider_columns(engine)
     columns = {column["name"] for column in inspect(engine).get_columns("catalogues")}
-    assert {"asr_provider", "translation_provider"} <= columns
+    assert {
+        "asr_provider",
+        "translation_provider",
+        "translation_pending",
+        "requested_output_languages",
+    } <= columns
     with engine.connect() as connection:
         rows = connection.execute(
-            text("SELECT id, asr_provider, translation_provider FROM catalogues ORDER BY id")
+            text(
+                "SELECT id, asr_provider, translation_provider, translation_pending "
+                "FROM catalogues ORDER BY id"
+            )
         ).all()
     assert rows == [
-        ("audio", "Bhashini", "Bhashini"),
-        ("text", None, "Bhashini"),
+        ("audio", "Bhashini", "Bhashini", 0),
+        ("text", None, "Bhashini", 0),
     ]
     engine.dispose()

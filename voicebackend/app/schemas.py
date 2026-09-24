@@ -66,12 +66,13 @@ class ClarificationQuestion(BaseModel):
 class Processing(BaseModel):
     asr_provider: str | None = None
     translation_provider: str | None = None
+    translation_pending: bool = False
 
 
 class CatalogueResponse(BaseModel):
     request_id: str
     catalogue_id: str
-    status: Literal["needs_clarification", "draft_ready"]
+    status: Literal["needs_clarification", "translation_pending", "draft_ready"]
     intent: Intent
     source_language: str
     original_transcript: str

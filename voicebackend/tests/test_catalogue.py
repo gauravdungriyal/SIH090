@@ -2,6 +2,7 @@ import io
 import wave
 
 from app.catalogue.rules import extract, generate_descriptions, validate_catalogue
+from app.gemini.client import GeminiError
 from app.schemas import Catalogue
 
 
@@ -149,6 +150,72 @@ def test_duplicate_request(client):
     )
 
 
+def test_translation_timeout_saves_reviewable_draft_and_retry_completes(client):
+    client.fake_gemini.translation_failure = GeminiError("timeout", "Gemini request timed out", 504)
+    first = post_text(client, "handmade jute bag ₹500 3 pieces", "en")
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["status"] == "translation_pending"
+    assert body["original_transcript"] == "handmade jute bag ₹500 3 pieces"
+    assert body["english_translation"] == body["original_transcript"]
+    assert body["hindi_translation"] is None
+    assert body["catalogue"]["price"] == 500
+    assert body["processing"]["translation_pending"] is True
+    assert body["processing"]["translation_provider"] is None
+    assert any("retry translations" in warning for warning in body["warnings"])
+
+    client.fake_gemini.translation_failure = None
+    retry = client.post(f"/api/v1/catalogues/{body['catalogue_id']}/retry-translations")
+    assert retry.status_code == 200, retry.text
+    updated = retry.json()
+    assert updated["catalogue_id"] == body["catalogue_id"]
+    assert updated["status"] == "draft_ready"
+    assert updated["hindi_translation"] is not None
+    assert updated["processing"]["translation_pending"] is False
+    assert updated["processing"]["translation_provider"] == "Gemini"
+    assert updated["warnings"] == []
+    assert client.get("/api/v1/catalogues").json()["total"] == 1
+
+
+def test_retry_keeps_pending_draft_when_gemini_is_still_busy(client):
+    client.fake_gemini.translation_failure = GeminiError("service_unavailable", "down", 503)
+    first = post_text(client, "handmade jute bag ₹500 3 pieces", "en").json()
+    retry = client.post(f"/api/v1/catalogues/{first['catalogue_id']}/retry-translations")
+    assert retry.status_code == 200
+    body = retry.json()
+    assert body["catalogue_id"] == first["catalogue_id"]
+    assert body["processing"]["translation_pending"] is True
+    assert body["status"] == "translation_pending"
+    assert client.get("/api/v1/catalogues").json()["total"] == 1
+
+
+def test_hindi_translation_timeout_preserves_missing_fields(client):
+    client.fake_gemini.translation_failure = GeminiError("service_unavailable", "down", 503)
+    response = post_text(client, "यह जूट का बैग ₹500 में है", "hi")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "needs_clarification"
+    assert body["english_translation"] is None
+    assert body["hindi_translation"] == body["original_transcript"]
+    assert "stock_quantity" in body["missing_fields"]
+    assert body["processing"]["translation_pending"] is True
+
+
+def test_unknown_text_is_not_accepted_when_translation_is_unavailable(client):
+    client.fake_gemini.translation_failure = GeminiError("timeout", "timeout", 504)
+    response = post_text(client, "अनूठी चीज", "hi")
+    assert response.status_code == 503
+    assert response.json()["code"] == "translation_unavailable"
+    assert client.get("/api/v1/catalogues").json()["total"] == 0
+
+
+def test_authentication_failure_is_not_hidden_by_partial_draft(client):
+    client.fake_gemini.translation_failure = GeminiError("authentication_failed", "bad key")
+    response = post_text(client, "handmade jute bag ₹500 3 pieces", "en")
+    assert response.status_code == 502
+    assert response.json()["code"] == "authentication_failed"
+
+
 def test_guided_text_answer(client):
     body = post_text(client, "handmade jute bag ₹500", "en").json()
     response = client.post(
@@ -163,6 +230,26 @@ def test_guided_text_answer(client):
     assert response.status_code == 200, response.text
     assert response.json()["catalogue"]["stock_quantity"] == 0
     assert response.json()["status"] == "draft_ready"
+
+
+def test_guided_answer_survives_translation_timeout(client):
+    original = post_text(client, "handmade jute bag ₹500", "en").json()
+    client.fake_gemini.translation_failure = GeminiError("timeout", "timeout", 504)
+    response = client.post(
+        "/api/v1/catalogues/guided-answer",
+        data={
+            "catalogue_id": original["catalogue_id"],
+            "field": "stock_quantity",
+            "source_language": "en",
+            "text": "5 pieces",
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["catalogue"]["stock_quantity"] == 5
+    assert body["status"] == "translation_pending"
+    assert body["processing"]["translation_pending"] is True
+    assert "[stock_quantity] 5 pieces" in body["original_transcript"]
 
 
 def test_guided_spoken_answer_uses_gemini(client):
@@ -206,6 +293,27 @@ def test_audio_workflow(client):
     assert response.status_code == 200, response.text
     assert response.json()["processing"]["asr_provider"] == "Gemini"
     assert response.json()["catalogue"]["price"] == 500
+
+
+def test_audio_workflow_saves_transcript_when_translation_times_out(client):
+    stream = io.BytesIO()
+    with wave.open(stream, "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(16000)
+        audio.writeframes(b"\0\0" * 16000)
+    client.fake_gemini.translation_failure = GeminiError("timeout", "timeout", 504)
+    response = client.post(
+        "/api/v1/catalogues/from-audio",
+        data={"source_language": "hi", "output_languages": "hi,en"},
+        files={"audio": ("recording.wav", stream.getvalue(), "audio/wav")},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["original_transcript"] == client.fake_gemini.transcript
+    assert body["processing"]["asr_provider"] == "Gemini"
+    assert body["processing"]["translation_pending"] is True
+    assert body["catalogue"]["price"] == 500
 
 
 def test_invalid_audio(client):

@@ -139,6 +139,10 @@ td { line-height: 1.45; color: #4d5c77; }
 td:first-child { min-width: 112px; }
 td code { color: #af327c; background: #f7f8fc; padding: 3px 5px; border-radius: 5px; font-size: 11px; }
 .sample-panel { margin-top: 26px; }
+.translation-notice { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: 14px; padding: 14px 16px; border: 1px solid #f2d69d; border-radius: 10px; background: #fff9ec; color: #75520d; font-size: 13px; }
+.translation-notice[hidden] { display: none; }
+.translation-notice strong { flex-basis: 100%; }
+.translation-notice .secondary-button { margin-left: auto; }
 .sample-tag { display: inline-block; padding: 5px 8px; border-radius: 7px; background: #f3f6fb; color: #8b98af; font-size: 11px; font-weight: 700; }
 .sample-output { max-height: 340px; overflow-y: auto; padding: 17px 19px; border: 1px solid var(--border); border-radius: 9px; background: #fbfcff; color: #33435e; }
 .info-view { display: grid; gap: 19px; }

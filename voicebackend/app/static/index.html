@@ -97,6 +97,11 @@
                   </div>
                 </div>
                 <pre id="liveResponse" class="live-response" aria-live="polite">Click “Send Request” to execute this endpoint.</pre>
+                <div id="translationNotice" class="translation-notice" hidden>
+                  <strong>Catalogue draft saved; translation is still pending.</strong>
+                  <span>Gemini is busy. Review the extracted fields now, then retry the missing translations.</span>
+                  <button id="retryTranslationsButton" class="secondary-button" type="button">Retry translations →</button>
+                </div>
 
                 <details class="docs-panel" open>
                   <summary><span class="summary-icon" aria-hidden="true">▣</span> Documentation & Parameters <span class="summary-endpoint" id="docsEndpointName"></span><span class="chevron" aria-hidden="true">⌄</span></summary>

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     gemini_transcription_model: str = "gemini-3.5-transcribe"
     gemini_text_model: str = "gemini-3.5-flash-lite"
     gemini_audio_fallback_model: str = "gemini-3.8-flash"
+    gemini_text_timeout_seconds: float = 12
     database_url: str = "sqlite:///./catalogue.db"
     max_audio_size_mb: int = 10
     max_audio_duration_seconds: int = 60

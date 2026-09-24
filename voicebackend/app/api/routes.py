@@ -44,8 +44,10 @@ from app.services.catalogue import (
     fingerprint,
     process_transcript,
     record_response,
+    retry_record_translations,
     update_record,
 )
+from app.services.translation import draft_status, translate_core
 from app.validators import validate_audio
 
 router = APIRouter()
@@ -234,13 +236,9 @@ async def guided_answer(
             "status": "rejected",
             "message": OFF_TOPIC_MESSAGE,
         }
-    english = (
-        answer if source_language == "en" else gemini.translate_text(answer, source_language, "en")
-    )
-    hindi = (
-        answer if source_language == "hi" else gemini.translate_text(answer, source_language, "hi")
-    )
-    parsing_text = english
+    translations = translate_core(answer, source_language, gemini)
+    english, hindi = translations.english, translations.hindi
+    parsing_text = english or answer
     if field == "price" and not re.search(
         r"price|cost|₹|rs\.?|rupees?|रुप", parsing_text, re.IGNORECASE
     ):
@@ -249,7 +247,7 @@ async def guided_answer(
         r"stock|quantity|units?|pieces?", parsing_text, re.IGNORECASE
     ):
         parsing_text = "stock " + parsing_text
-    parsed = extract([parsing_text, hindi], settings.default_currency_inr)
+    parsed = extract([parsing_text, hindi or ""], settings.default_currency_inr)
     catalogue = Catalogue.model_validate(record.catalogue)
     value = getattr(parsed, field)
     if field in {"product_name", "location", "care_instructions", "special_features"}:
@@ -267,14 +265,16 @@ async def guided_answer(
         else:
             value = [stripped] if stripped else []
     elif field == "is_handmade" and value is None:
-        if re.search(r"\b(yes|true)\b|हाँ|हां", english + " " + hindi, re.IGNORECASE):
+        if re.search(r"\b(yes|true)\b|हाँ|हां", f"{english or ''} {hindi or ''}", re.IGNORECASE):
             value = True
-        elif re.search(r"\b(no|false)\b|नहीं", english + " " + hindi, re.IGNORECASE):
+        elif re.search(r"\b(no|false)\b|नहीं", f"{english or ''} {hindi or ''}", re.IGNORECASE):
             value = False
     if field == "price" and value is not None:
         catalogue.currency = parsed.currency
     if field == "currency":
-        if re.search(r"₹|\b(?:inr|rupees?|rs\.?)\b|रुप", english + " " + hindi, re.IGNORECASE):
+        if re.search(
+            r"₹|\b(?:inr|rupees?|rs\.?)\b|रुप", f"{english or ''} {hindi or ''}", re.IGNORECASE
+        ):
             value = "INR"
         else:
             value = None
@@ -298,19 +298,25 @@ async def guided_answer(
     catalogue = generate_descriptions(catalogue)
     record.catalogue = catalogue.model_dump()
     record.missing_fields = missing
-    record.status = "needs_clarification" if missing else "draft_ready"
+    record.translation_pending = record.translation_pending or translations.pending
+    record.status = draft_status(missing, record.translation_pending)
     record.intent = Intent.PRODUCT_CORRECTION.value
     record.original_transcript += f"\n[{field}] {answer}"
-    record.english_translation = (record.english_translation or "") + f"\n[{field}] {english}"
-    record.hindi_translation = (record.hindi_translation or "") + f"\n[{field}] {hindi}"
+    if english:
+        record.english_translation = (record.english_translation or "") + f"\n[{field}] {english}"
+    if hindi:
+        record.hindi_translation = (record.hindi_translation or "") + f"\n[{field}] {hindi}"
     if audio_used and record.asr_provider != "Gemini":
         record.asr_provider = ", ".join(
             dict.fromkeys(filter(None, [record.asr_provider, "Gemini"]))
         )
-    if record.translation_provider != "Gemini":
+    if translations.used_gemini and record.translation_provider != "Gemini":
         record.translation_provider = ", ".join(
             dict.fromkeys(filter(None, [record.translation_provider, "Gemini"]))
         )
+    record.warnings.extend(
+        warning for warning in translations.warnings if warning not in record.warnings
+    )
     repo.save(record)
     return record_response(record, request.state.request_id)
 
@@ -324,6 +330,22 @@ def validate(body: ValidationRequest):
         errors=errors,
         clarification_questions=questions_for(missing),
     )
+
+
+@router.post(
+    "/api/v1/catalogues/{catalogue_id}/retry-translations", response_model=CatalogueResponse
+)
+def retry_translations(
+    catalogue_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    gemini: GeminiClient = Depends(get_gemini),
+):
+    repo = CatalogueRepository(db)
+    record = repo.get(catalogue_id)
+    if not record:
+        raise HTTPException(status_code=404, detail={"code": "catalogue_not_found"})
+    return retry_record_translations(record, repo, gemini, request.state.request_id)
 
 
 @router.get("/api/v1/catalogues/{catalogue_id}", response_model=CatalogueResponse)

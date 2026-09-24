@@ -17,9 +17,12 @@ class FakeGemini:
     def __init__(self):
         self.transcript = "हाथ से बना जूट का बैग ₹500 में है और 10 पीस उपलब्ध हैं"
         self.calls = []
+        self.translation_failure = None
 
     def translate_text(self, text, source, target):
         self.calls.append(("translation", source, target))
+        if self.translation_failure:
+            raise self.translation_failure
         return text
 
     def transcribe_audio(self, audio, source, audio_format, sampling_rate):

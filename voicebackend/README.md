@@ -35,7 +35,7 @@ The API runs at `http://127.0.0.1:8000`. Open the [interactive API tester](http:
 
 Create a Gemini API key in [Google AI Studio](https://ai.google.dev/gemini-api/docs/get-started) and set `GEMINI_API_KEY` in `voicebackend/.env`. The backend reads it server-side. Never put `.env` in version control or send the key to a mobile app. API access, quotas, and billing depend on your Google AI Studio project.
 
-The model IDs in `.env.example` are configurable. The remaining variables control the database URL, audio limits, timeouts, CORS, INR default policy, and the per-process rate-limit hook. `/api/v1/languages` lists candidate input codes; Tamil and Urdu transcription uses the general audio fallback model. The backend exposes `transliterate_text()` for a future script-specific UX.
+The model IDs in `.env.example` are configurable. `GEMINI_TEXT_TIMEOUT_SECONDS` bounds each text translation call independently of the longer audio timeout. The remaining variables control the database URL, audio limits, CORS, INR default policy, and the per-process rate-limit hook. `/api/v1/languages` lists candidate input codes; Tamil and Urdu transcription uses the general audio fallback model. The backend exposes `transliterate_text()` for a future script-specific UX.
 
 ### Docker
 
@@ -57,13 +57,16 @@ The Docker image uses SQLite in a persistent volume. For PostgreSQL, install a P
 | POST | `/api/v1/catalogues/from-text` | Create a draft from a transcript |
 | POST | `/api/v1/catalogues/guided-answer` | Record one answer for one existing draft field |
 | POST | `/api/v1/catalogues/validate` | Validate an editable catalogue object |
+| POST | `/api/v1/catalogues/{catalogue_id}/retry-translations` | Retry missing Gemini translations on the same draft |
 | GET | `/api/v1/catalogues/{catalogue_id}` | Read a draft |
 | PUT | `/api/v1/catalogues/{catalogue_id}` | Replace editable catalogue fields |
 | GET | `/api/v1/catalogues` | List with `page`, `page_size`, and `search` |
 
 `transcriptions/from-audio` accepts multipart fields `audio` and `source_language`. It returns `request_id`, `source_language`, `transcript`, `audio_format`, `sampling_rate_hz`, and `asr_provider`; it does not create a catalogue. `catalogues/from-audio` also accepts `output_languages` (comma-separated, default `hi,en`), optional `artisan_id`, and optional `session_id`. Uploads may be mono or stereo WAV, FLAC, MP3, or M4A at 8–48 kHz and at most 60 seconds by default. `guided-answer` uses multipart fields `catalogue_id`, `field`, `source_language`, and either `text` or `audio`. The 12 guided fields are `product_name`, `category`, `materials`, `craft_type`, `colors`, `dimensions`, `price`, `stock_quantity`, `location`, `is_handmade`, `special_features`, and `care_instructions`. `weight` and `currency` answers are also supported. Each audio answer goes through Gemini transcription. `from-text` accepts JSON with `text`, `source_language`, `output_languages`, `artisan_id`, and `session_id`. Supported candidate codes: `as`, `bn`, `en`, `gu`, `hi`, `kn`, `ml`, `mr`, `or`, `pa`, `ta`, `te`, `ur`.
 
-For creation calls, send `X-Idempotency-Key` to safely retry the same request. A repeated key with different input returns HTTP 409. All responses include an `X-Request-ID` header, and successful drafts include `request_id` in JSON. A draft status is `needs_clarification` or `draft_ready`; off-topic content returns `rejected` without a catalogue ID or an answer to the question.
+For creation calls, send `X-Idempotency-Key` to safely retry the same request. A repeated key with different input returns HTTP 409. All responses include an `X-Request-ID` header, and successful drafts include `request_id` in JSON. A draft status is `needs_clarification`, `translation_pending`, or `draft_ready`; off-topic content returns `rejected` without a catalogue ID or an answer to the question.
+
+When Gemini text translation times out, is rate limited, or returns a temporary service error, a clearly product-related transcript can still produce a draft from the original text. Unavailable transcript translations stay `null`; `processing.translation_pending` is `true`, and `warnings` explain the limitation. The original transcript and extracted fields are saved. If the product also lacks required fields, the status remains `needs_clarification`; otherwise it is `translation_pending`. Use the retry endpoint or the tester's **Retry translations** button when Gemini recovers. The retry updates translations and requested description languages without changing extracted facts or creating another draft. Inputs that cannot be safely classified without translation return HTTP 503 for a later retry. Authentication and configuration errors remain explicit errors.
 
 ### curl examples
 
@@ -82,6 +85,8 @@ curl -X POST http://127.0.0.1:8000/api/v1/transcriptions/from-audio \
 curl -X POST http://127.0.0.1:8000/api/v1/catalogues/guided-answer \
   -F 'catalogue_id=YOUR_UUID' -F 'field=stock_quantity' \
   -F 'source_language=hi' -F 'audio=@answer.wav;type=audio/wav'
+
+curl -X POST http://127.0.0.1:8000/api/v1/catalogues/YOUR_UUID/retry-translations
 
 curl 'http://127.0.0.1:8000/api/v1/catalogues?page=1&page_size=20&search=jute'
 ```
@@ -106,4 +111,4 @@ Tests mock Gemini and need no real credentials. They cover Hindi and mixed text,
 
 ## Known limitations
 
-The parser is rule based and vocabulary coverage is intentionally small. Gemini transcription and translation can make mistakes, especially for mixed speech, names, Tamil, and Urdu. Live Gemini credentials and models are not exercised by the test suite. More scripts and synonyms should be added to the JSON vocabulary as real recordings are reviewed. Generated non-Hindi/non-English descriptions use Gemini translation and should be reviewed by the artisan. For a public deployment, add authentication and artisan ownership checks, shared rate limiting, versioned database migrations, and a publication approval workflow.
+The parser is rule based and vocabulary coverage is intentionally small. Gemini transcription and translation can make mistakes, especially for mixed speech, names, Tamil, and Urdu. During a translation outage, regional-language drafts may have fewer extracted fields because the rules only know the configured vocabulary; do not publish while `translation_pending` is true. Live Gemini credentials and models are not exercised by the test suite. More scripts and synonyms should be added to the JSON vocabulary as real recordings are reviewed. Generated non-Hindi/non-English descriptions use Gemini translation and should be reviewed by the artisan. For a public deployment, add authentication and artisan ownership checks, shared rate limiting, versioned database migrations, and a publication approval workflow.

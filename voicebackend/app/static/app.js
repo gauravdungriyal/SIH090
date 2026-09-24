@@ -27,7 +27,7 @@ const sampleDraft = {
     question_hi: "कितनी इकाइयाँ उपलब्ध हैं?",
   }],
   warnings: [],
-  processing: { asr_provider: null, translation_provider: "Gemini" },
+  processing: { asr_provider: null, translation_provider: "Gemini", translation_pending: false },
   created_at: "2026-09-24T10:30:00Z",
   updated_at: "2026-09-24T10:30:00Z",
 };
@@ -54,7 +54,7 @@ const requestFields = {
 const draftResponseFields = [
   ["request_id", "UUID", "Unique identifier for this API call; also sent in the X-Request-ID header."],
   ["catalogue_id", "UUID", "Identifier to use for guided answers, reads and edits."],
-  ["status", "string", "needs_clarification or draft_ready; this service does not publish products."],
+  ["status", "string", "needs_clarification, translation_pending or draft_ready; this service does not publish products."],
   ["intent", "string", "Deterministic classification of the product input."],
   ["source_language", "string", "Input language code."],
   ["original_transcript", "string", "Original typed text or Gemini transcript, retained for review."],
@@ -82,6 +82,7 @@ const draftResponseFields = [
   ["clarification_questions", "object[]", "English and Hindi questions for the missing fields."],
   ["warnings", "string[]", "Nonfatal extraction or guided-answer warnings."],
   ["processing", "object", "Language-processing providers used for this draft."],
+  ["processing.translation_pending", "boolean", "True when a temporary Gemini failure left a requested translation unfinished."],
   ["created_at / updated_at", "datetime", "Draft creation and last update timestamps."],
 ];
 
@@ -113,7 +114,7 @@ const endpoints = [
   {
     id: "from-text", group: "3. Create a catalogue", label: "Create from text", method: "POST", path: "/api/v1/catalogues/from-text", kind: "json",
     description: "Turns a typed transcript into a structured draft. Gemini translates it into Hindi and English before deterministic extraction.",
-    docs: "Send a product-related transcript. Off-topic questions are rejected without an answer. Translation needs GEMINI_API_KEY.",
+    docs: "Send a product-related transcript. Off-topic questions are rejected without an answer. If Gemini translation is temporarily unavailable, the original text can still produce an editable draft; missing translations stay null and can be retried.",
     request: [
       ["text", "string · required", "Artisan's product description or transcript; cannot be empty."],
       ...requestFields.language,
@@ -128,7 +129,7 @@ const endpoints = [
   {
     id: "from-audio", group: "3. Create a catalogue", label: "Create from audio", method: "POST", path: "/api/v1/catalogues/from-audio", kind: "audio",
     description: "Uploads a recording, validates it, transcribes it with Gemini, and creates an editable catalogue draft.",
-    docs: "Upload WAV, FLAC, MP3 or M4A audio at 8–48 kHz. Default limits are 10 MB and 60 seconds. Uploaded audio is deleted from Google's Files API after processing.",
+    docs: "Upload WAV, FLAC, MP3 or M4A audio at 8–48 kHz. Default limits are 10 MB and 60 seconds. Uploaded audio is deleted from Google's Files API after processing. A temporary translation outage leaves an editable draft with translation_pending=true.",
     request: [
       ["audio", "file · required", "Artisan recording in WAV, FLAC, MP3 or M4A format."],
       ...requestFields.language,
@@ -137,7 +138,7 @@ const endpoints = [
       ["X-Idempotency-Key", "header · optional", "Safely retry the same upload without creating another draft."],
     ],
     response: draftResponseFields,
-    sample: { ...sampleDraft, processing: { asr_provider: "Gemini", translation_provider: "Gemini" } },
+    sample: { ...sampleDraft, processing: { asr_provider: "Gemini", translation_provider: "Gemini", translation_pending: false } },
   },
   {
     id: "guided", group: "4. Guided interview", label: "Submit guided answer", method: "POST", path: "/api/v1/catalogues/guided-answer", kind: "guided",
@@ -161,6 +162,14 @@ const endpoints = [
     response: [["valid", "boolean", "True only when required values are present and all rules pass."], ["missing_fields", "string[]", "Required or conditionally required values still absent."], ["errors", "string[]", "Invalid prices, quantities, dimensions, units or languages."], ["clarification_questions", "object[]", "English and Hindi prompts for missing fields."]],
     example: { source_language: "hi", catalogue: sampleCatalogue },
     sample: { valid: false, missing_fields: ["stock_quantity"], errors: [], clarification_questions: [{ field: "stock_quantity", question_en: "How many units are available?", question_hi: "कितनी इकाइयाँ उपलब्ध हैं?" }] },
+  },
+  {
+    id: "retry-translations", group: "5. Manage drafts", label: "Retry translations", method: "POST", path: "/api/v1/catalogues/{catalogue_id}/retry-translations", kind: "catalogue-id",
+    description: "Retries missing Gemini translations for an existing draft without changing extracted product facts.",
+    docs: "Use when processing.translation_pending is true. The same catalogue ID is kept. If Gemini is still busy, the draft remains available and the pending flag stays true.",
+    request: [["catalogue_id", "UUID · path", "ID of a draft with pending translations."]],
+    response: draftResponseFields,
+    sample: { ...sampleDraft, status: "translation_pending", english_translation: null, warnings: ["Gemini translation is temporarily unavailable. The original transcript is saved; retry translations before publishing."], processing: { asr_provider: null, translation_provider: null, translation_pending: true } },
   },
   {
     id: "get", group: "5. Manage drafts", label: "Get catalogue", method: "GET", path: "/api/v1/catalogues/{catalogue_id}", kind: "catalogue-id",
@@ -372,12 +381,13 @@ function renderEditor(item) {
   }
 }
 
-function setResponse(status, type, elapsed, content) {
+function setResponse(status, type, elapsed, content, translationPending = false) {
   const pill = byId("responseStatus");
   pill.className = `status-pill ${type}`;
   pill.textContent = status;
   byId("responseTime").textContent = elapsed;
   byId("liveResponse").textContent = content;
+  byId("translationNotice").hidden = !translationPending;
 }
 
 function setRecorderStatus(message) {
@@ -549,7 +559,7 @@ function selectEndpoint(id) {
   renderNavigation();
   if (state.responses[id]) {
     const previous = state.responses[id];
-    setResponse(previous.status, previous.type, previous.elapsed, previous.content);
+    setResponse(previous.status, previous.type, previous.elapsed, previous.content, previous.translationPending);
   } else {
     setResponse("Ready", "ready", "0 ms", "Click “Send Request” to execute this endpoint.");
   }
@@ -661,8 +671,9 @@ async function sendRequest(overrideItem = null) {
     const status = `${response.status} ${response.statusText}`.trim();
     const content = typeof body === "string" ? body : JSON.stringify(body, null, 2);
     const type = response.ok ? "success" : "error";
-    setResponse(status, type, elapsed, content);
-    state.responses[item.id] = { status, type, elapsed, content };
+    const translationPending = Boolean(body?.processing?.translation_pending);
+    setResponse(status, type, elapsed, content, translationPending);
+    state.responses[item.id] = { status, type, elapsed, content, translationPending };
     if (response.ok && body && typeof body === "object") {
       if (typeof body.transcript === "string") showTranscript(body.transcript, body.source_language);
       else if (typeof body.original_transcript === "string") showTranscript(body.original_transcript, body.source_language);
@@ -687,6 +698,7 @@ async function sendRequest(overrideItem = null) {
 document.addEventListener("DOMContentLoaded", () => {
   byId("endpointSearch").addEventListener("input", renderNavigation);
   byId("sendButton").addEventListener("click", () => sendRequest());
+  byId("retryTranslationsButton").addEventListener("click", () => { selectEndpoint("retry-translations"); sendRequest(); });
   byId("useTranscriptButton").addEventListener("click", () => {
     if (!state.transcript) return;
     selectEndpoint("from-text");

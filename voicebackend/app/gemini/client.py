@@ -207,6 +207,7 @@ class GeminiClient:
                 input=text,
                 system_instruction=instruction,
                 generation_config={"temperature": 0},
+                timeout=self.settings.gemini_text_timeout_seconds,
             )
         )
         return self._text(getattr(response, "output_text", None))
