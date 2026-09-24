@@ -2,11 +2,13 @@ import logging
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.bhashini.client import BhashiniError
@@ -25,6 +27,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Voice and Catalogue Microservice", version="0.1.0", lifespan=lifespan)
+static_dir = Path(__file__).resolve().parent / "static"
+app.mount("/tester/assets", StaticFiles(directory=static_dir), name="tester-assets")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
@@ -68,3 +72,13 @@ async def bhashini_error(request: Request, exc: BhashiniError):
 
 
 app.include_router(router)
+
+
+@app.get("/", include_in_schema=False)
+def home():
+    return RedirectResponse(url="/tester")
+
+
+@app.get("/tester", include_in_schema=False)
+def tester():
+    return FileResponse(static_dir / "index.html")

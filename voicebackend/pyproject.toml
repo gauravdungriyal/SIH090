@@ -24,6 +24,7 @@ include = ["app*"]
 
 [tool.setuptools.package-data]
 "app.catalogue" = ["vocabulary.json"]
+"app" = ["static/*.html", "static/*.css", "static/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

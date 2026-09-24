@@ -29,7 +29,7 @@ cp .env.example .env             # Windows PowerShell: Copy-Item .env.example .e
 python -m uvicorn app.main:app --reload
 ```
 
-The API runs at `http://127.0.0.1:8000`; interactive OpenAPI docs are at `/docs`, the raw schema at `/openapi.json`, and `/health` confirms the process is running. Configure credentials before trying translation or audio requests. Health, language listing, draft reads and validation do not need Bhashini credentials.
+The API runs at `http://127.0.0.1:8000`. Open the [interactive API tester](http://127.0.0.1:8000/tester) to choose an endpoint, edit its request, send it to the local service, and compare the live response with a clearly labelled example. It also explains request and response fields for each operation. FastAPI OpenAPI docs are at `/docs`, the raw schema at `/openapi.json`, and `/health` confirms the process is running. Configure credentials before trying translation or audio requests. Health, language listing, draft reads and validation do not need Bhashini credentials.
 
 ### Bhashini credentials
 

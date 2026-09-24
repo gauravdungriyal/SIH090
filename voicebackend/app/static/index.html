@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f7f9fd" />
+    <title>Voice & Catalogue API · Live Tester</title>
+    <link rel="stylesheet" href="/tester/assets/style.css" />
+    <script src="/tester/assets/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="site-header">
+        <div class="brand-lockup">
+          <span class="brand-mark" aria-hidden="true">◖▮◗</span>
+          <div>
+            <div class="eyebrow">SIH090 · DEVELOPER CONSOLE</div>
+            <h1>Voice & Catalogue <span>API</span></h1>
+          </div>
+        </div>
+        <div class="header-actions">
+          <span class="environment-pill"><span class="pulse-dot"></span> Local environment</span>
+          <a class="openapi-link" href="/docs" target="_blank" rel="noopener noreferrer">OpenAPI docs <span aria-hidden="true">↗</span></a>
+        </div>
+      </header>
+
+      <nav class="top-tabs" aria-label="Tester views">
+        <button class="tab active" data-view="interactive" type="button" aria-current="page"><span aria-hidden="true">✦</span> Interactive Live Tester</button>
+        <button class="tab" data-view="deep-dive" type="button"><span aria-hidden="true">▣</span> How it works</button>
+        <button class="tab" data-view="all-endpoints" type="button"><span aria-hidden="true">▤</span> All Endpoints & Schemas</button>
+      </nav>
+
+      <div class="workspace">
+        <aside class="sidebar" aria-label="API endpoints">
+          <div class="sidebar-heading">
+            <div>
+              <span class="eyebrow">EXPLORE THE API</span>
+              <h2>API Endpoints</h2>
+            </div>
+            <span class="endpoint-count" id="endpointCount">9</span>
+          </div>
+          <label class="search-wrap">
+            <span class="search-icon" aria-hidden="true">⌕</span>
+            <span class="sr-only">Filter endpoints</span>
+            <input id="endpointSearch" type="search" placeholder="Search endpoints..." autocomplete="off" />
+          </label>
+          <div id="endpointNav" class="endpoint-nav"></div>
+          <div class="sidebar-footer">
+            <span class="sidebar-footer-icon" aria-hidden="true">ⓘ</span>
+            <p>Requests run against this local backend. Audio and translation need Bhashini credentials.</p>
+          </div>
+        </aside>
+
+        <main class="main-panel" id="mainContent">
+          <section id="interactiveView" class="view active" aria-label="Interactive API tester">
+            <article class="tester-card">
+              <div class="endpoint-header">
+                <div class="endpoint-heading">
+                  <span id="methodBadge" class="method-badge">POST</span>
+                  <div class="heading-copy">
+                    <h2 id="endpointTitle">Create from text</h2>
+                    <code id="endpointPath" class="path-chip">/api/v1/catalogues/from-text</code>
+                  </div>
+                </div>
+                <button id="sendButton" class="primary-button" type="button"><span aria-hidden="true">➤</span> <span id="sendLabel">Send Request</span></button>
+              </div>
+
+              <div class="endpoint-body">
+                <div class="description-callout">
+                  <span class="info-icon" aria-hidden="true">i</span>
+                  <p id="endpointDescription"></p>
+                </div>
+
+                <div class="section-title-row">
+                  <div>
+                    <div class="overline">REQUEST</div>
+                    <h3 id="requestHeading">Request payload</h3>
+                  </div>
+                  <span class="section-hint" id="requestHint">Edit fields before sending</span>
+                </div>
+                <div id="requestEditor" class="request-editor"></div>
+
+                <div class="response-heading">
+                  <div>
+                    <div class="overline">LIVE RESPONSE</div>
+                    <h3>Response from <code id="responsePath">/api/v1/catalogues/from-text</code></h3>
+                  </div>
+                  <div class="response-meta">
+                    <span id="responseStatus" class="status-pill ready">Ready</span>
+                    <span id="responseTime" class="response-time">0 ms</span>
+                  </div>
+                </div>
+                <pre id="liveResponse" class="live-response" aria-live="polite">Click “Send Request” to execute this endpoint.</pre>
+
+                <details class="docs-panel" open>
+                  <summary><span class="summary-icon" aria-hidden="true">▣</span> Documentation & Parameters <span class="summary-endpoint" id="docsEndpointName"></span><span class="chevron" aria-hidden="true">⌄</span></summary>
+                  <div class="docs-content">
+                    <p id="docsSummary" class="docs-summary"></p>
+                    <div class="field-columns">
+                      <section>
+                        <h4>Request fields</h4>
+                        <div class="table-scroll"><table><thead><tr><th>FIELD</th><th>TYPE</th><th>DESCRIPTION</th></tr></thead><tbody id="requestFields"></tbody></table></div>
+                      </section>
+                      <section>
+                        <h4>Response fields</h4>
+                        <div class="table-scroll"><table><thead><tr><th>FIELD</th><th>TYPE</th><th>DESCRIPTION</th></tr></thead><tbody id="responseFields"></tbody></table></div>
+                      </section>
+                    </div>
+                  </div>
+                </details>
+
+                <section class="sample-panel" aria-labelledby="sampleTitle">
+                  <div class="sample-heading"><div><div class="overline">REFERENCE</div><h3 id="sampleTitle">Sample output</h3></div><span class="sample-tag">Example only</span></div>
+                  <pre id="sampleOutput" class="sample-output"></pre>
+                </section>
+              </div>
+            </article>
+          </section>
+
+          <section id="deepDiveView" class="view info-view" aria-label="How the service works" hidden>
+            <div class="info-hero"><span class="eyebrow">REQUEST FLOW</span><h2>From a spoken detail to an editable draft.</h2><p>The mobile app talks to this service; language processing goes through Bhashini, while catalogue decisions use transparent backend rules.</p></div>
+            <div class="flow-grid">
+              <div class="flow-card"><span class="flow-number">01</span><h3>Capture & validate</h3><p>Send text or a mono WAV, FLAC or MP3 recording with a selected source language. Upload size, format and duration are checked.</p></div>
+              <div class="flow-card"><span class="flow-number">02</span><h3>Transcribe & translate</h3><p>Bhashini returns the original transcript and Hindi and English translations. Its model IDs and credentials stay on the server.</p></div>
+              <div class="flow-card"><span class="flow-number">03</span><h3>Extract & clarify</h3><p>Keyword dictionaries and patterns identify product fields. Missing values stay empty and become guided questions.</p></div>
+              <div class="flow-card"><span class="flow-number">04</span><h3>Review the draft</h3><p>Controlled templates create descriptions. The draft is saved and every extracted field can be edited before publishing elsewhere.</p></div>
+            </div>
+            <div class="note-card"><strong>Testing without credentials</strong><p>Health, languages, validation, list and read operations work locally. ASR and translation calls need the values in <code>voicebackend/.env</code>. The sample output on this page is illustrative and never substituted for a live API response.</p></div>
+          </section>
+
+          <section id="allEndpointsView" class="view info-view" aria-label="All endpoints and schemas" hidden>
+            <div class="info-hero"><span class="eyebrow">API REFERENCE</span><h2>All operations in one place.</h2><p>Choose an operation to open its live request editor, or use the generated OpenAPI schema.</p><a class="secondary-link" href="/openapi.json" target="_blank" rel="noopener noreferrer">View OpenAPI JSON ↗</a></div>
+            <div id="endpointGrid" class="endpoint-grid"></div>
+          </section>
+        </main>
+      </div>
+      <footer class="page-footer">SIH090 Voice & Catalogue Microservice <span>·</span> Local API tester</footer>
+    </div>
+  </body>
+</html>

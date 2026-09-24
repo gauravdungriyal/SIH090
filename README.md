@@ -20,4 +20,4 @@ cp .env.example .env
 python -m uvicorn app.main:app --reload
 ```
 
-See the [voice backend README](voicebackend/README.md) for Bhashini credentials, API examples, Docker setup and test commands. Keep real credentials in local `.env` files; they are ignored by Git.
+Once running, open `http://127.0.0.1:8000/tester` for the interactive API tester. See the [voice backend README](voicebackend/README.md) for Bhashini credentials, API examples, Docker setup and test commands. Keep real credentials in local `.env` files; they are ignored by Git.
