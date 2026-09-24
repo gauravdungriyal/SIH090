@@ -1,0 +1,56 @@
+{
+  "categories": {
+    "Saree": ["saree", "sari", "साड़ी", "साड़ी"],
+    "Shawl": ["shawl", "शॉल"],
+    "Basket": ["basket", "टोकरी"],
+    "Bag": ["bag", "बैग", "थैला"],
+    "Pottery": ["pottery", "pot", "मिट्टी के बर्तन", "बर्तन", "घड़ा"],
+    "Carpet": ["carpet", "rug", "कालीन"],
+    "Jewellery": ["jewellery", "jewelry", "आभूषण", "गहने"],
+    "Painting": ["painting", "चित्रकारी", "पेंटिंग"],
+    "Wooden craft": ["wooden craft", "लकड़ी की कारीगरी"],
+    "Metal craft": ["metal craft", "धातु शिल्प"],
+    "Textile": ["textile", "वस्त्र"],
+    "Handloom fabric": ["handloom fabric", "हथकरघा कपड़ा"]
+  },
+  "materials": {
+    "Cotton": ["cotton", "सूती", "कपास"],
+    "Silk": ["silk", "रेशम", "सिल्क"],
+    "Wool": ["wool", "ऊन"],
+    "Jute": ["jute", "जूट"],
+    "Bamboo": ["bamboo", "बाँस", "बांस"],
+    "Cane": ["cane", "बेंत"],
+    "Clay": ["clay", "मिट्टी"],
+    "Wood": ["wood", "लकड़ी"],
+    "Brass": ["brass", "पीतल"],
+    "Copper": ["copper", "तांबा", "ताँबा"],
+    "Silver": ["silver", "चांदी", "चाँदी"],
+    "Leather": ["leather", "चमड़ा"]
+  },
+  "colors": {
+    "Red": ["red", "लाल"], "Blue": ["blue", "नीला", "नीली"],
+    "Green": ["green", "हरा", "हरी"], "Yellow": ["yellow", "पीला", "पीली"],
+    "Black": ["black", "काला", "काली"], "White": ["white", "सफेद", "सफ़ेद"],
+    "Brown": ["brown", "भूरा", "भूरी"], "Pink": ["pink", "गुलाबी"],
+    "Orange": ["orange", "नारंगी"], "Purple": ["purple", "बैंगनी"],
+    "Gold": ["gold", "सुनहरा"], "Grey": ["grey", "gray", "स्लेटी"]
+  },
+  "crafts": {
+    "Chikankari": ["chikankari", "चिकनकारी"],
+    "Banarasi": ["banarasi", "बनारसी"],
+    "Madhubani": ["madhubani", "मधुबनी"],
+    "Dhokra": ["dhokra", "डोकरा", "ढोकरा"],
+    "Phulkari": ["phulkari", "फुलकारी"],
+    "Pashmina": ["pashmina", "पश्मीना"],
+    "Kanjeevaram": ["kanjeevaram", "कांजीवरम"],
+    "Bandhani": ["bandhani", "बांधनी"],
+    "Kalamkari": ["kalamkari", "कलमकारी"],
+    "Blue Pottery": ["blue pottery", "ब्लू पॉटरी"],
+    "Block Printing": ["block printing", "ब्लॉक प्रिंटिंग"]
+  },
+  "product_keywords": ["product", "item", "sell", "selling", "price", "cost", "stock", "quantity", "handmade", "made", "craft", "artisan", "catalogue", "catalog", "उत्पाद", "सामान", "कीमत", "रुपये", "बेचना", "हाथ से", "हस्तनिर्मित", "उपलब्ध", "बनाया"],
+  "correction_keywords": ["correct", "change", "update", "instead", "actually", "सुधार", "बदल", "गलत", "असल में"],
+  "question_keywords": ["what is the price", "how many", "क्या कीमत", "कितने", "?"],
+  "handmade_positive": ["handmade", "hand woven", "handwoven", "handcrafted", "हाथ से बना", "हाथ से बनी", "हस्तनिर्मित", "हाथ की बनी"],
+  "handmade_negative": ["not handmade", "machine made", "मशीन से बना", "हाथ से नहीं"]
+}
