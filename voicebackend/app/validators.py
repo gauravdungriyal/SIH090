@@ -46,6 +46,18 @@ async def validate_audio(upload: UploadFile, settings: Settings) -> tuple[bytes,
         if not parsed or not parsed.info:
             raise HTTPException(status_code=422, detail={"code": "invalid_audio"})
         rate, duration, channels = parsed.info.sample_rate, parsed.info.length, parsed.info.channels
+    elif len(data) > 12 and data[4:8] == b"ftyp":
+        audio_format, media_types = (
+            "m4a",
+            {"audio/m4a", "audio/mp4", "audio/x-m4a", "application/octet-stream"},
+        )
+        try:
+            parsed = MutagenFile(io.BytesIO(data))
+        except (MutagenError, ValueError, OSError) as exc:
+            raise HTTPException(status_code=422, detail={"code": "invalid_audio"}) from exc
+        if not parsed or not parsed.info:
+            raise HTTPException(status_code=422, detail={"code": "invalid_audio"})
+        rate, duration, channels = parsed.info.sample_rate, parsed.info.length, parsed.info.channels
     elif data.startswith(b"ID3") or data[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
         audio_format, media_types = "mp3", {"audio/mpeg", "audio/mp3", "application/octet-stream"}
         try:
@@ -58,23 +70,23 @@ async def validate_audio(upload: UploadFile, settings: Settings) -> tuple[bytes,
     else:
         raise HTTPException(
             status_code=422,
-            detail={"code": "invalid_audio_format", "message": "Use WAV, FLAC, or MP3 audio"},
+            detail={"code": "invalid_audio_format", "message": "Use WAV, FLAC, MP3, or M4A audio"},
         )
     if upload.content_type not in media_types:
         raise HTTPException(status_code=422, detail={"code": "invalid_audio_type"})
     extension = safe_filename.rsplit(".", 1)[-1].lower() if "." in safe_filename else ""
-    if extension in {"wav", "flac", "mp3"} and extension != audio_format:
+    if extension in {"wav", "flac", "mp3", "m4a"} and extension != audio_format:
         raise HTTPException(status_code=422, detail={"code": "invalid_audio_format"})
     if (
         not 0 < duration <= settings.max_audio_duration_seconds
         or not 8000 <= rate <= 48000
-        or channels != 1
+        or channels not in (1, 2)
     ):
         raise HTTPException(
             status_code=422,
             detail={
                 "code": "invalid_audio_properties",
-                "message": "Use mono audio, 8–48 kHz, within the duration limit",
+                "message": "Use mono or stereo audio, 8–48 kHz, within the duration limit",
             },
         )
     return data, audio_format, rate

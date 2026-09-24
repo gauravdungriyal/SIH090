@@ -27,7 +27,7 @@ const sampleDraft = {
     question_hi: "कितनी इकाइयाँ उपलब्ध हैं?",
   }],
   warnings: [],
-  processing: { asr_provider: null, translation_provider: "Bhashini" },
+  processing: { asr_provider: null, translation_provider: "Gemini" },
   created_at: "2026-09-24T10:30:00Z",
   updated_at: "2026-09-24T10:30:00Z",
 };
@@ -38,7 +38,7 @@ const sampleTranscription = {
   transcript: "यह हाथ से बना जूट का बैग ₹500 में है।",
   audio_format: "wav",
   sampling_rate_hz: 16000,
-  asr_provider: "Bhashini",
+  asr_provider: "Gemini",
 };
 
 const requestFields = {
@@ -57,9 +57,9 @@ const draftResponseFields = [
   ["status", "string", "needs_clarification or draft_ready; this service does not publish products."],
   ["intent", "string", "Deterministic classification of the product input."],
   ["source_language", "string", "Input language code."],
-  ["original_transcript", "string", "Original typed text or Bhashini ASR transcript, retained for review."],
-  ["english_translation", "string | null", "Bhashini English translation, or the original English input."],
-  ["hindi_translation", "string | null", "Bhashini Hindi translation, or the original Hindi input."],
+  ["original_transcript", "string", "Original typed text or Gemini transcript, retained for review."],
+  ["english_translation", "string | null", "Gemini English translation, or the original English input."],
+  ["hindi_translation", "string | null", "Gemini Hindi translation, or the original Hindi input."],
   ["catalogue.product_name", "string | null", "Product name inferred from observed details or supplied by the artisan."],
   ["catalogue.category", "string | null", "Mapped product type, such as Bag or Saree."],
   ["catalogue.materials", "string[]", "Observed materials; empty when none are recognized."],
@@ -77,7 +77,7 @@ const draftResponseFields = [
   ["catalogue.care_instructions", "string | null", "Buyer care instructions, when supplied."],
   ["catalogue.description_en", "string | null", "Controlled English template using known facts only."],
   ["catalogue.description_hi", "string | null", "Controlled Hindi template using known facts only."],
-  ["catalogue.description_translations", "object", "Bhashini translations requested for other supported languages."],
+  ["catalogue.description_translations", "object", "Gemini translations requested for other supported languages."],
   ["missing_fields", "string[]", "Required fields still missing from this draft."],
   ["clarification_questions", "object[]", "English and Hindi questions for the missing fields."],
   ["warnings", "string[]", "Nonfatal extraction or guided-answer warnings."],
@@ -88,7 +88,7 @@ const draftResponseFields = [
 const endpoints = [
   {
     id: "health", group: "1. Service & discovery", label: "Health check", method: "GET", path: "/health", kind: "none",
-    description: "Checks that the local API process is responding. This does not call Bhashini.",
+    description: "Checks that the local API process is responding. This does not call Gemini.",
     docs: "Use this before a demo or integration test to confirm the backend is running.",
     request: [["—", "none", "No path parameters, query parameters or request body are required."]],
     response: [["status", "string", "ok when the API process is running."]],
@@ -96,24 +96,24 @@ const endpoints = [
   },
   {
     id: "languages", group: "1. Service & discovery", label: "Supported languages", method: "GET", path: "/api/v1/languages", kind: "none",
-    description: "Lists language codes accepted by this service and notes that actual model support depends on your Bhashini pipeline.",
-    docs: "Show these codes in the source-language selector. A selected Bhashini model may support a smaller set.",
+    description: "Lists language codes accepted by this service and notes the Gemini transcription fallback for Tamil and Urdu.",
+    docs: "Show these codes in the source-language selector. Tamil and Urdu use the configurable general audio model; verify accuracy before publishing.",
     request: [["—", "none", "No request body or parameters are required."]],
-    response: [["languages", "object[]", "Candidate source language codes and display names."], ["note", "string", "Explains the Bhashini model-availability limitation."]],
-    sample: { languages: [{ code: "en", name: "English" }, { code: "hi", name: "Hindi" }, { code: "ta", name: "Tamil" }], note: "Actual ASR and translation support depends on the configured Bhashini pipeline." },
+    response: [["languages", "object[]", "Candidate source language codes and display names."], ["note", "string", "Explains the Gemini transcription fallback for Tamil and Urdu."]],
+    sample: { languages: [{ code: "en", name: "English" }, { code: "hi", name: "Hindi" }, { code: "ta", name: "Tamil" }], note: "Gemini's dedicated transcription model supports most listed languages. Tamil and Urdu use the configured audio fallback model; its accuracy may vary." },
   },
   {
     id: "transcribe", group: "2. Voice to text", label: "Transcribe audio", method: "POST", path: "/api/v1/transcriptions/from-audio", kind: "audio",
-    description: "Record with your microphone or upload audio, then use Bhashini ASR to return only the transcript. No catalogue is created.",
-    docs: "Record in the browser or upload mono WAV, FLAC or MP3 audio at 8–48 kHz. Default limits are 10 MB and 60 seconds. This call requires Bhashini credentials and does not store raw audio.",
-    request: [["audio", "file · required", "A mono WAV, FLAC or MP3 recording. Browser recordings are converted to 16 kHz mono WAV."], ...requestFields.language],
-    response: [["request_id", "UUID", "Unique call identifier, also sent in X-Request-ID."], ["source_language", "string", "Language selected for Bhashini ASR."], ["transcript", "string", "Recognized speech in the source language; no translation or extraction."], ["audio_format", "string", "Validated input format."], ["sampling_rate_hz", "integer", "Validated audio sampling rate."], ["asr_provider", "string", "Bhashini."],],
+    description: "Record with your microphone or upload audio, then use Gemini to return only the transcript. No catalogue is created.",
+    docs: "Record in the browser or upload WAV, FLAC, MP3 or M4A audio at 8–48 kHz. Default limits are 10 MB and 60 seconds. Set GEMINI_API_KEY on the server. Uploaded audio is deleted from Google's Files API after processing.",
+    request: [["audio", "file · required", "A WAV, FLAC, MP3 or M4A recording. Browser recordings are converted to 16 kHz mono WAV."], ...requestFields.language],
+    response: [["request_id", "UUID", "Unique call identifier, also sent in X-Request-ID."], ["source_language", "string", "Language selected for Gemini transcription."], ["transcript", "string", "Recognized speech in the source language; no translation or extraction."], ["audio_format", "string", "Validated input format."], ["sampling_rate_hz", "integer", "Validated audio sampling rate."], ["asr_provider", "string", "Gemini."],],
     sample: sampleTranscription,
   },
   {
     id: "from-text", group: "3. Create a catalogue", label: "Create from text", method: "POST", path: "/api/v1/catalogues/from-text", kind: "json",
-    description: "Turns a typed transcript into a structured draft. Bhashini translates it into Hindi and English before deterministic extraction.",
-    docs: "Send a product-related transcript. Off-topic questions are rejected without an answer. Translation needs Bhashini credentials.",
+    description: "Turns a typed transcript into a structured draft. Gemini translates it into Hindi and English before deterministic extraction.",
+    docs: "Send a product-related transcript. Off-topic questions are rejected without an answer. Translation needs GEMINI_API_KEY.",
     request: [
       ["text", "string · required", "Artisan's product description or transcript; cannot be empty."],
       ...requestFields.language,
@@ -127,22 +127,22 @@ const endpoints = [
   },
   {
     id: "from-audio", group: "3. Create a catalogue", label: "Create from audio", method: "POST", path: "/api/v1/catalogues/from-audio", kind: "audio",
-    description: "Uploads a recording, validates it, transcribes it with Bhashini ASR, and creates an editable catalogue draft.",
-    docs: "Upload mono WAV, FLAC or MP3 audio at 8–48 kHz. Default limits are 10 MB and 60 seconds. Raw audio is not permanently stored.",
+    description: "Uploads a recording, validates it, transcribes it with Gemini, and creates an editable catalogue draft.",
+    docs: "Upload WAV, FLAC, MP3 or M4A audio at 8–48 kHz. Default limits are 10 MB and 60 seconds. Uploaded audio is deleted from Google's Files API after processing.",
     request: [
-      ["audio", "file · required", "Artisan recording in WAV, FLAC or MP3 format."],
+      ["audio", "file · required", "Artisan recording in WAV, FLAC, MP3 or M4A format."],
       ...requestFields.language,
       ["output_languages", "comma-separated string", "Requested languages, for example hi,en."],
       ...requestFields.ids,
       ["X-Idempotency-Key", "header · optional", "Safely retry the same upload without creating another draft."],
     ],
     response: draftResponseFields,
-    sample: { ...sampleDraft, processing: { asr_provider: "Bhashini", translation_provider: "Bhashini" } },
+    sample: { ...sampleDraft, processing: { asr_provider: "Gemini", translation_provider: "Gemini" } },
   },
   {
     id: "guided", group: "4. Guided interview", label: "Submit guided answer", method: "POST", path: "/api/v1/catalogues/guided-answer", kind: "guided",
     description: "Adds one typed or spoken answer to a selected field of an existing draft, then updates its missing-field questions.",
-    docs: "Provide exactly one of text or audio. A spoken answer is transcribed by Bhashini. Use catalogue_id returned by a creation call.",
+    docs: "Provide exactly one of text or audio. A spoken answer is transcribed by Gemini. Use catalogue_id returned by a creation call.",
     request: [
       ["catalogue_id", "UUID · required", "Existing draft to update."],
       ["field", "string · required", "Catalogue field being answered, such as stock_quantity or materials."],
@@ -155,7 +155,7 @@ const endpoints = [
   },
   {
     id: "validate", group: "4. Guided interview", label: "Validate catalogue", method: "POST", path: "/api/v1/catalogues/validate", kind: "json",
-    description: "Checks a catalogue object without saving it or calling Bhashini. Useful before an artisan confirms edits.",
+    description: "Checks a catalogue object without saving it or calling Gemini. Useful before an artisan confirms edits.",
     docs: "This endpoint reports missing required fields and invalid values. It does not update an existing draft.",
     request: [["source_language", "string · required", "Language code for the draft."], ["catalogue", "object · required", "Full catalogue field object to validate. Unknown fields are rejected."]],
     response: [["valid", "boolean", "True only when required values are present and all rules pass."], ["missing_fields", "string[]", "Required or conditionally required values still absent."], ["errors", "string[]", "Invalid prices, quantities, dimensions, units or languages."], ["clarification_questions", "object[]", "English and Hindi prompts for missing fields."]],
@@ -263,7 +263,7 @@ function makeInput(name, labelText, type, value = "", help = "", options = [], f
     input = create("input", "form-control");
     input.type = type;
     if (type !== "file") input.value = value;
-    if (type === "file") input.accept = ".wav,.flac,.mp3,audio/wav,audio/flac,audio/mpeg";
+    if (type === "file") input.accept = ".wav,.flac,.mp3,.m4a,audio/wav,audio/flac,audio/mpeg,audio/m4a";
   }
   input.id = `field-${name}`;
   input.name = name;
@@ -332,7 +332,7 @@ function renderEditor(item) {
   if (item.kind === "catalogue-id") return;
   const grid = create("div", "form-grid");
   if (item.kind === "audio") {
-    grid.append(makeInput("audio", "Audio recording *", "file", "", "Mono WAV, FLAC or MP3; at most 10 MB and 60 seconds by default.", [], true));
+    grid.append(makeInput("audio", "Audio recording *", "file", "", "WAV, FLAC, MP3 or M4A; at most 10 MB and 60 seconds by default.", [], true));
     grid.append(makeInput("source_language", "Source language *", "select", "hi", "The language spoken in the recording.", languageOptions));
     grid.append(recorderControls());
     if (item.id === "from-audio") {
@@ -341,14 +341,14 @@ function renderEditor(item) {
       grid.append(makeInput("session_id", "Session ID", "text", "", "Optional interview session identifier."));
       grid.append(makeInput("idempotency_key", "X-Idempotency-Key", "text", "", "Optional retry key."));
     }
-    grid.append(formNote("Record creates a 16 kHz mono WAV in the browser. Transcribe returns text only; Send Request follows the selected endpoint. Live ASR needs BHASHINI_* credentials in voicebackend/.env."));
+    grid.append(formNote("Record creates a 16 kHz mono WAV in the browser. Transcribe returns text only; Send Request follows the selected endpoint. Live transcription needs GEMINI_API_KEY in voicebackend/.env."));
   } else if (item.kind === "guided") {
     grid.append(makeInput("catalogue_id", "Catalogue ID *", "text", state.latestId, "The latest created draft ID is filled automatically.", [], true));
     grid.append(makeInput("field", "Field to answer *", "select", "stock_quantity", "Choose one catalogue field.", guidedFields));
     grid.append(makeInput("source_language", "Answer language *", "select", "hi", "Language used in this answer.", languageOptions));
     grid.append(makeInput("text", "Typed answer", "textarea", "10 pieces", "Provide text or an audio recording, not both.", [], true));
     grid.append(makeInput("audio", "Spoken answer", "file", "", "Selecting audio clears the typed answer.", [], true));
-    grid.append(formNote("Audio answers use Bhashini ASR. Typed answers in a different source language use Bhashini translation."));
+    grid.append(formNote("Audio answers use Gemini transcription. Typed answers in a different source language use Gemini translation."));
   } else if (item.kind === "list") {
     grid.append(makeInput("page", "Page", "number", "1", "Starts at 1."));
     grid.append(makeInput("page_size", "Page size", "number", "20", "Choose 1 to 100."));

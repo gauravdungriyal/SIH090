@@ -109,6 +109,7 @@ def test_off_topic_question(client):
     assert body["status"] == "rejected"
     assert body["message"] == "I can only help create or update artisan product catalogue entries."
     assert "catalogue_id" not in body
+    assert client.fake_gemini.calls == []
 
 
 def test_prompt_injection(client):
@@ -117,6 +118,7 @@ def test_prompt_injection(client):
     ).json()
     assert body["intent"] == "OFF_TOPIC"
     assert body["status"] == "rejected"
+    assert client.fake_gemini.calls == []
 
 
 def test_description_omits_missing():
@@ -163,7 +165,7 @@ def test_guided_text_answer(client):
     assert response.json()["status"] == "draft_ready"
 
 
-def test_guided_spoken_answer_uses_bhashini(client):
+def test_guided_spoken_answer_uses_gemini(client):
     body = post_text(client, "handmade jute bag ₹500", "en").json()
     stream = io.BytesIO()
     with wave.open(stream, "wb") as audio:
@@ -171,7 +173,7 @@ def test_guided_spoken_answer_uses_bhashini(client):
         audio.setsampwidth(2)
         audio.setframerate(16000)
         audio.writeframes(b"\0\0" * 16000)
-    client.fake_bhashini.transcript = "5 pieces"
+    client.fake_gemini.transcript = "5 pieces"
     response = client.post(
         "/api/v1/catalogues/guided-answer",
         data={
@@ -183,7 +185,7 @@ def test_guided_spoken_answer_uses_bhashini(client):
     )
     assert response.status_code == 200, response.text
     assert response.json()["catalogue"]["stock_quantity"] == 5
-    assert ("asr", "en", "wav") in client.fake_bhashini.calls
+    assert ("asr", "en", "wav") in client.fake_gemini.calls
 
 
 def test_audio_workflow(client):
@@ -202,7 +204,7 @@ def test_audio_workflow(client):
         files={"audio": ("../recording.wav", stream.getvalue(), "audio/wav")},
     )
     assert response.status_code == 200, response.text
-    assert response.json()["processing"]["asr_provider"] == "Bhashini"
+    assert response.json()["processing"]["asr_provider"] == "Gemini"
     assert response.json()["catalogue"]["price"] == 500
 
 

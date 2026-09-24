@@ -47,7 +47,7 @@
           <div id="endpointNav" class="endpoint-nav"></div>
           <div class="sidebar-footer">
             <span class="sidebar-footer-icon" aria-hidden="true">ⓘ</span>
-            <p>Requests run against this local backend. Audio and translation need Bhashini credentials.</p>
+            <p>Requests run against this local backend. Audio and translation need a Gemini API key.</p>
           </div>
         </aside>
 
@@ -124,10 +124,10 @@
           </section>
 
           <section id="deepDiveView" class="view info-view" aria-label="How the service works" hidden>
-            <div class="info-hero"><span class="eyebrow">REQUEST FLOW</span><h2>From a spoken detail to an editable draft.</h2><p>The mobile app talks to this service; language processing goes through Bhashini, while catalogue decisions use transparent backend rules.</p></div>
+            <div class="info-hero"><span class="eyebrow">REQUEST FLOW</span><h2>From a spoken detail to an editable draft.</h2><p>The mobile app talks to this service; Gemini handles transcription and translation, while catalogue decisions use transparent backend rules.</p></div>
             <div class="flow-grid">
-              <div class="flow-card"><span class="flow-number">01</span><h3>Capture & validate</h3><p>Send text or a mono WAV, FLAC or MP3 recording with a selected source language. Upload size, format and duration are checked.</p></div>
-              <div class="flow-card"><span class="flow-number">02</span><h3>Transcribe & translate</h3><p>Bhashini returns the original transcript and Hindi and English translations. Its model IDs and credentials stay on the server.</p></div>
+              <div class="flow-card"><span class="flow-number">01</span><h3>Capture & validate</h3><p>Send text or a WAV, FLAC, MP3 or M4A recording with a selected source language. Upload size, format and duration are checked.</p></div>
+              <div class="flow-card"><span class="flow-number">02</span><h3>Transcribe & translate</h3><p>Gemini returns the original transcript and Hindi and English translations. Its model IDs and API key stay on the server.</p></div>
               <div class="flow-card"><span class="flow-number">03</span><h3>Extract & clarify</h3><p>Keyword dictionaries and patterns identify product fields. Missing values stay empty and become guided questions.</p></div>
               <div class="flow-card"><span class="flow-number">04</span><h3>Review the draft</h3><p>Controlled templates create descriptions. The draft is saved and every extracted field can be edited before publishing elsewhere.</p></div>
             </div>

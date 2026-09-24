@@ -14,7 +14,6 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from app.bhashini.client import BhashiniClient
 from app.catalogue.rules import (
     LANGUAGES,
     OFF_TOPIC_MESSAGE,
@@ -25,6 +24,7 @@ from app.catalogue.rules import (
     validate_catalogue,
 )
 from app.config import Settings, get_settings
+from app.gemini.client import GeminiClient
 from app.models import get_db
 from app.repositories import CatalogueRepository
 from app.schemas import (
@@ -51,12 +51,12 @@ from app.validators import validate_audio
 router = APIRouter()
 
 
-def get_bhashini(settings: Settings = Depends(get_settings)):
-    client = BhashiniClient(settings)
+def get_gemini(settings: Settings = Depends(get_settings)):
+    client = GeminiClient(settings)
     try:
         yield client
     finally:
-        client.http.close()
+        client.close()
 
 
 def parse_languages(raw: str) -> list[str]:
@@ -77,7 +77,7 @@ def health():
 def languages():
     return {
         "languages": [{"code": code, "name": name} for code, name in LANGUAGES.items()],
-        "note": "Actual ASR and translation support depends on the configured Bhashini pipeline.",
+        "note": "Gemini's dedicated transcription model supports most listed languages. Tamil and Urdu use the configured audio fallback model; its accuracy may vary.",
     }
 
 
@@ -86,12 +86,12 @@ async def transcribe_audio(
     request: Request,
     audio: UploadFile = File(...),
     source_language: str = Form(...),
-    bhashini: BhashiniClient = Depends(get_bhashini),
+    gemini: GeminiClient = Depends(get_gemini),
     settings: Settings = Depends(get_settings),
 ):
     check_language(source_language)
     data, audio_format, rate = await validate_audio(audio, settings)
-    transcript = bhashini.transcribe_audio(data, source_language, audio_format, rate)
+    transcript = gemini.transcribe_audio(data, source_language, audio_format, rate)
     if not transcript or not transcript.strip():
         raise HTTPException(
             status_code=422,
@@ -111,7 +111,7 @@ def from_text(
     body: TextRequest,
     request: Request,
     db: Session = Depends(get_db),
-    bhashini: BhashiniClient = Depends(get_bhashini),
+    gemini: GeminiClient = Depends(get_gemini),
     settings: Settings = Depends(get_settings),
     idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key", max_length=200),
 ):
@@ -123,7 +123,7 @@ def from_text(
         session_id=body.session_id,
         request_id=request.state.request_id,
         repo=CatalogueRepository(db),
-        bhashini=bhashini,
+        gemini=gemini,
         default_currency_inr=settings.default_currency_inr,
         idempotency_key=idempotency_key,
         request_fingerprint=fingerprint(body.model_dump()),
@@ -139,7 +139,7 @@ async def from_audio(
     artisan_id: str | None = Form(None),
     session_id: str | None = Form(None),
     db: Session = Depends(get_db),
-    bhashini: BhashiniClient = Depends(get_bhashini),
+    gemini: GeminiClient = Depends(get_gemini),
     settings: Settings = Depends(get_settings),
     idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key", max_length=200),
 ):
@@ -162,8 +162,8 @@ async def from_audio(
         if found:
             if found.fingerprint != payload_fingerprint:
                 raise HTTPException(status_code=409, detail={"code": "idempotency_conflict"})
-            return record_response(found.catalogue, request.state.request_id, True)
-    transcript = bhashini.transcribe_audio(data, source_language, audio_format, rate)
+            return record_response(found.catalogue, request.state.request_id)
+    transcript = gemini.transcribe_audio(data, source_language, audio_format, rate)
     return process_transcript(
         transcript=transcript,
         source_language=source_language,
@@ -172,7 +172,7 @@ async def from_audio(
         session_id=session_id,
         request_id=request.state.request_id,
         repo=repo,
-        bhashini=bhashini,
+        gemini=gemini,
         default_currency_inr=settings.default_currency_inr,
         idempotency_key=idempotency_key,
         request_fingerprint=payload_fingerprint,
@@ -191,7 +191,7 @@ async def guided_answer(
     text: str | None = Form(None),
     audio: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    bhashini: BhashiniClient = Depends(get_bhashini),
+    gemini: GeminiClient = Depends(get_gemini),
     settings: Settings = Depends(get_settings),
 ):
     check_language(source_language)
@@ -224,7 +224,7 @@ async def guided_answer(
     audio_used = audio is not None
     if audio:
         data, audio_format, rate = await validate_audio(audio, settings)
-        answer = bhashini.transcribe_audio(data, source_language, audio_format, rate)
+        answer = gemini.transcribe_audio(data, source_language, audio_format, rate)
     else:
         answer = text.strip()
     if classify_intent([answer]) == Intent.OFF_TOPIC:
@@ -235,14 +235,10 @@ async def guided_answer(
             "message": OFF_TOPIC_MESSAGE,
         }
     english = (
-        answer
-        if source_language == "en"
-        else bhashini.translate_text(answer, source_language, "en")
+        answer if source_language == "en" else gemini.translate_text(answer, source_language, "en")
     )
     hindi = (
-        answer
-        if source_language == "hi"
-        else bhashini.translate_text(answer, source_language, "hi")
+        answer if source_language == "hi" else gemini.translate_text(answer, source_language, "hi")
     )
     parsing_text = english
     if field == "price" and not re.search(
@@ -307,8 +303,16 @@ async def guided_answer(
     record.original_transcript += f"\n[{field}] {answer}"
     record.english_translation = (record.english_translation or "") + f"\n[{field}] {english}"
     record.hindi_translation = (record.hindi_translation or "") + f"\n[{field}] {hindi}"
+    if audio_used and record.asr_provider != "Gemini":
+        record.asr_provider = ", ".join(
+            dict.fromkeys(filter(None, [record.asr_provider, "Gemini"]))
+        )
+    if record.translation_provider != "Gemini":
+        record.translation_provider = ", ".join(
+            dict.fromkeys(filter(None, [record.translation_provider, "Gemini"]))
+        )
     repo.save(record)
-    return record_response(record, request.state.request_id, audio_used)
+    return record_response(record, request.state.request_id)
 
 
 @router.post("/api/v1/catalogues/validate", response_model=ValidationResponse)

@@ -11,9 +11,9 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
-from app.bhashini.client import BhashiniError
 from app.config import get_settings
-from app.models import Base, engine
+from app.gemini.client import GeminiError
+from app.models import Base, engine, migrate_provider_columns
 
 logging.basicConfig(level=logging.INFO)
 settings = get_settings()
@@ -23,6 +23,7 @@ rate_windows: dict[str, deque[float]] = defaultdict(deque)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    migrate_provider_columns(engine)
     yield
 
 
@@ -63,8 +64,8 @@ async def request_context(request: Request, call_next):
     return response
 
 
-@app.exception_handler(BhashiniError)
-async def bhashini_error(request: Request, exc: BhashiniError):
+@app.exception_handler(GeminiError)
+async def gemini_error(request: Request, exc: GeminiError):
     return JSONResponse(
         status_code=exc.status_code,
         content={"request_id": request.state.request_id, "code": exc.code, "message": exc.message},

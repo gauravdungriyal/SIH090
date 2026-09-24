@@ -6,16 +6,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    bhashini_user_id: str = ""
-    bhashini_api_key: str = ""
-    bhashini_pipeline_id: str = ""
-    bhashini_asr_service_id: str = "bhashini/ai4bharat/conformer-multilingual-asr"
-    bhashini_translation_service_id: str = "ai4bharat/indictrans-v2-all-gpu--t4"
-    bhashini_transliteration_service_id: str = ""
-    bhashini_config_url: str = (
-        "https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline"
-    )
-    bhashini_compute_url: str = "https://dhruva-api.bhashini.gov.in/services/inference/pipeline"
+    gemini_api_key: str = ""
+    gemini_transcription_model: str = "gemini-3.5-transcribe"
+    gemini_text_model: str = "gemini-3.5-flash-lite"
+    gemini_audio_fallback_model: str = "gemini-3.8-flash"
     database_url: str = "sqlite:///./catalogue.db"
     max_audio_size_mb: int = 10
     max_audio_duration_seconds: int = 60

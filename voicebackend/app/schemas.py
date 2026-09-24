@@ -99,7 +99,7 @@ class TranscriptionResponse(BaseModel):
     transcript: str
     audio_format: str
     sampling_rate_hz: int
-    asr_provider: Literal["Bhashini"] = "Bhashini"
+    asr_provider: Literal["Gemini"] = "Gemini"
 
 
 class TextRequest(BaseModel):

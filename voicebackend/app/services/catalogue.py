@@ -4,7 +4,6 @@ from uuid import uuid4
 
 from fastapi import HTTPException
 
-from app.bhashini.client import BhashiniClient
 from app.catalogue.rules import (
     LANGUAGES,
     OFF_TOPIC_MESSAGE,
@@ -14,6 +13,7 @@ from app.catalogue.rules import (
     questions_for,
     validate_catalogue,
 )
+from app.gemini.client import GeminiClient
 from app.models import CatalogueRecord
 from app.repositories import CatalogueRepository, IdempotencyConflict
 from app.schemas import Catalogue, CatalogueResponse, Intent, Processing
@@ -33,9 +33,7 @@ def fingerprint(payload: dict) -> str:
     ).hexdigest()
 
 
-def record_response(
-    record: CatalogueRecord, request_id: str, asr: bool = False
-) -> CatalogueResponse:
+def record_response(record: CatalogueRecord, request_id: str) -> CatalogueResponse:
     return CatalogueResponse(
         request_id=request_id,
         catalogue_id=record.id,
@@ -50,8 +48,8 @@ def record_response(
         clarification_questions=questions_for(record.missing_fields),
         warnings=record.warnings,
         processing=Processing(
-            asr_provider="Bhashini" if asr or record.audio_used else None,
-            translation_provider="Bhashini",
+            asr_provider=record.asr_provider,
+            translation_provider=record.translation_provider,
         ),
         created_at=record.created_at,
         updated_at=record.updated_at,
@@ -67,7 +65,7 @@ def process_transcript(
     session_id: str | None,
     request_id: str,
     repo: CatalogueRepository,
-    bhashini: BhashiniClient,
+    gemini: GeminiClient,
     default_currency_inr: bool,
     idempotency_key: str | None = None,
     request_fingerprint: str | None = None,
@@ -92,7 +90,7 @@ def process_transcript(
                         "message": "Key used for a different request",
                     },
                 )
-            return record_response(found.catalogue, request_id, audio_used)
+            return record_response(found.catalogue, request_id)
     preliminary = classify_intent([transcript])
     if preliminary == Intent.OFF_TOPIC:
         return {
@@ -104,12 +102,12 @@ def process_transcript(
     english = (
         transcript
         if source_language == "en"
-        else bhashini.translate_text(transcript, source_language, "en")
+        else gemini.translate_text(transcript, source_language, "en")
     )
     hindi = (
         transcript
         if source_language == "hi"
-        else bhashini.translate_text(transcript, source_language, "hi")
+        else gemini.translate_text(transcript, source_language, "hi")
     )
     intent = classify_intent([transcript, english, hindi])
     if intent in (Intent.OFF_TOPIC, Intent.UNCLEAR):
@@ -126,7 +124,7 @@ def process_transcript(
     catalogue = generate_descriptions(catalogue)
     for lang in output_languages:
         if lang not in ("en", "hi") and catalogue.description_en:
-            catalogue.description_translations[lang] = bhashini.translate_text(
+            catalogue.description_translations[lang] = gemini.translate_text(
                 catalogue.description_en, "en", lang
             )
     record = CatalogueRecord(
@@ -143,6 +141,8 @@ def process_transcript(
         intent=intent.value,
         warnings=[],
         audio_used=audio_used,
+        asr_provider="Gemini" if audio_used else None,
+        translation_provider="Gemini",
     )
     try:
         record = repo.create(record, idempotency_key, request_fingerprint)
@@ -151,7 +151,7 @@ def process_transcript(
             status_code=409,
             detail={"code": "idempotency_conflict", "message": "Key used for a different request"},
         ) from exc
-    return record_response(record, request_id, audio_used)
+    return record_response(record, request_id)
 
 
 def update_record(

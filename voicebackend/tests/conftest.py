@@ -8,12 +8,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api.routes import get_bhashini
+from app.api.routes import get_gemini
 from app.main import app
 from app.models import Base, get_db
 
 
-class FakeBhashini:
+class FakeGemini:
     def __init__(self):
         self.transcript = "हाथ से बना जूट का बैग ₹500 में है और 10 पीस उपलब्ध हैं"
         self.calls = []
@@ -34,16 +34,16 @@ def client():
     )
     Base.metadata.create_all(engine)
     session_factory = sessionmaker(bind=engine, expire_on_commit=False)
-    fake = FakeBhashini()
+    fake = FakeGemini()
 
     def test_db():
         with session_factory() as db:
             yield db
 
     app.dependency_overrides[get_db] = test_db
-    app.dependency_overrides[get_bhashini] = lambda: fake
+    app.dependency_overrides[get_gemini] = lambda: fake
     with TestClient(app) as test_client:
-        test_client.fake_bhashini = fake
+        test_client.fake_gemini = fake
         yield test_client
     app.dependency_overrides.clear()
     engine.dispose()
