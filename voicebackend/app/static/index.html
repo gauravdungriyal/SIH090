@@ -37,7 +37,7 @@
               <span class="eyebrow">EXPLORE THE API</span>
               <h2>API Endpoints</h2>
             </div>
-            <span class="endpoint-count" id="endpointCount">9</span>
+            <span class="endpoint-count" id="endpointCount">10</span>
           </div>
           <label class="search-wrap">
             <span class="search-icon" aria-hidden="true">⌕</span>
@@ -79,6 +79,12 @@
                   <span class="section-hint" id="requestHint">Edit fields before sending</span>
                 </div>
                 <div id="requestEditor" class="request-editor"></div>
+
+                <section id="transcriptPanel" class="transcript-panel" hidden aria-live="polite">
+                  <div class="transcript-topline"><span class="overline">RECOGNIZED SPEECH</span><span id="transcriptLanguage" class="transcript-language"></span></div>
+                  <p id="transcriptText" class="transcript-text"></p>
+                  <button id="useTranscriptButton" class="secondary-button" type="button">Use transcript to create catalogue →</button>
+                </section>
 
                 <div class="response-heading">
                   <div>

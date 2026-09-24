@@ -32,6 +32,15 @@ const sampleDraft = {
   updated_at: "2026-09-24T10:30:00Z",
 };
 
+const sampleTranscription = {
+  request_id: "97eec61b-1f3a-40c5-9ec7-9fcb619d5001",
+  source_language: "hi",
+  transcript: "यह हाथ से बना जूट का बैग ₹500 में है।",
+  audio_format: "wav",
+  sampling_rate_hz: 16000,
+  asr_provider: "Bhashini",
+};
+
 const requestFields = {
   language: [
     ["source_language", "string · required", "ISO language code of the spoken or typed input, such as hi or en."],
@@ -94,7 +103,15 @@ const endpoints = [
     sample: { languages: [{ code: "en", name: "English" }, { code: "hi", name: "Hindi" }, { code: "ta", name: "Tamil" }], note: "Actual ASR and translation support depends on the configured Bhashini pipeline." },
   },
   {
-    id: "from-text", group: "2. Create a catalogue", label: "Create from text", method: "POST", path: "/api/v1/catalogues/from-text", kind: "json",
+    id: "transcribe", group: "2. Voice to text", label: "Transcribe audio", method: "POST", path: "/api/v1/transcriptions/from-audio", kind: "audio",
+    description: "Record with your microphone or upload audio, then use Bhashini ASR to return only the transcript. No catalogue is created.",
+    docs: "Record in the browser or upload mono WAV, FLAC or MP3 audio at 8–48 kHz. Default limits are 10 MB and 60 seconds. This call requires Bhashini credentials and does not store raw audio.",
+    request: [["audio", "file · required", "A mono WAV, FLAC or MP3 recording. Browser recordings are converted to 16 kHz mono WAV."], ...requestFields.language],
+    response: [["request_id", "UUID", "Unique call identifier, also sent in X-Request-ID."], ["source_language", "string", "Language selected for Bhashini ASR."], ["transcript", "string", "Recognized speech in the source language; no translation or extraction."], ["audio_format", "string", "Validated input format."], ["sampling_rate_hz", "integer", "Validated audio sampling rate."], ["asr_provider", "string", "Bhashini."],],
+    sample: sampleTranscription,
+  },
+  {
+    id: "from-text", group: "3. Create a catalogue", label: "Create from text", method: "POST", path: "/api/v1/catalogues/from-text", kind: "json",
     description: "Turns a typed transcript into a structured draft. Bhashini translates it into Hindi and English before deterministic extraction.",
     docs: "Send a product-related transcript. Off-topic questions are rejected without an answer. Translation needs Bhashini credentials.",
     request: [
@@ -109,7 +126,7 @@ const endpoints = [
     sample: sampleDraft,
   },
   {
-    id: "from-audio", group: "2. Create a catalogue", label: "Create from audio", method: "POST", path: "/api/v1/catalogues/from-audio", kind: "audio",
+    id: "from-audio", group: "3. Create a catalogue", label: "Create from audio", method: "POST", path: "/api/v1/catalogues/from-audio", kind: "audio",
     description: "Uploads a recording, validates it, transcribes it with Bhashini ASR, and creates an editable catalogue draft.",
     docs: "Upload mono WAV, FLAC or MP3 audio at 8–48 kHz. Default limits are 10 MB and 60 seconds. Raw audio is not permanently stored.",
     request: [
@@ -123,7 +140,7 @@ const endpoints = [
     sample: { ...sampleDraft, processing: { asr_provider: "Bhashini", translation_provider: "Bhashini" } },
   },
   {
-    id: "guided", group: "3. Guided interview", label: "Submit guided answer", method: "POST", path: "/api/v1/catalogues/guided-answer", kind: "guided",
+    id: "guided", group: "4. Guided interview", label: "Submit guided answer", method: "POST", path: "/api/v1/catalogues/guided-answer", kind: "guided",
     description: "Adds one typed or spoken answer to a selected field of an existing draft, then updates its missing-field questions.",
     docs: "Provide exactly one of text or audio. A spoken answer is transcribed by Bhashini. Use catalogue_id returned by a creation call.",
     request: [
@@ -137,7 +154,7 @@ const endpoints = [
     sample: { ...sampleDraft, status: "draft_ready", intent: "PRODUCT_CORRECTION", catalogue: { ...sampleCatalogue, stock_quantity: 10 }, missing_fields: [], clarification_questions: [] },
   },
   {
-    id: "validate", group: "3. Guided interview", label: "Validate catalogue", method: "POST", path: "/api/v1/catalogues/validate", kind: "json",
+    id: "validate", group: "4. Guided interview", label: "Validate catalogue", method: "POST", path: "/api/v1/catalogues/validate", kind: "json",
     description: "Checks a catalogue object without saving it or calling Bhashini. Useful before an artisan confirms edits.",
     docs: "This endpoint reports missing required fields and invalid values. It does not update an existing draft.",
     request: [["source_language", "string · required", "Language code for the draft."], ["catalogue", "object · required", "Full catalogue field object to validate. Unknown fields are rejected."]],
@@ -146,7 +163,7 @@ const endpoints = [
     sample: { valid: false, missing_fields: ["stock_quantity"], errors: [], clarification_questions: [{ field: "stock_quantity", question_en: "How many units are available?", question_hi: "कितनी इकाइयाँ उपलब्ध हैं?" }] },
   },
   {
-    id: "get", group: "4. Manage drafts", label: "Get catalogue", method: "GET", path: "/api/v1/catalogues/{catalogue_id}", kind: "catalogue-id",
+    id: "get", group: "5. Manage drafts", label: "Get catalogue", method: "GET", path: "/api/v1/catalogues/{catalogue_id}", kind: "catalogue-id",
     description: "Fetches a saved catalogue draft, including the original transcript, extracted fields and clarification questions.",
     docs: "Use the catalogue_id returned by create or guided-answer. The tester fills the latest ID automatically after a successful call.",
     request: [["catalogue_id", "UUID · path", "ID of the draft to retrieve."]],
@@ -154,7 +171,7 @@ const endpoints = [
     sample: sampleDraft,
   },
   {
-    id: "update", group: "4. Manage drafts", label: "Edit catalogue", method: "PUT", path: "/api/v1/catalogues/{catalogue_id}", kind: "update",
+    id: "update", group: "5. Manage drafts", label: "Edit catalogue", method: "PUT", path: "/api/v1/catalogues/{catalogue_id}", kind: "update",
     description: "Replaces editable catalogue fields for a saved draft and regenerates descriptions and missing-field questions.",
     docs: "Send the full catalogue object, not only changed fields. The tester uses the latest live draft as a starting point when available.",
     request: [["catalogue_id", "UUID · path", "ID of the draft to edit."], ["catalogue", "object · required", "Complete edited catalogue field object. Description fields are regenerated by the server."]],
@@ -163,7 +180,7 @@ const endpoints = [
     sample: { ...sampleDraft, status: "draft_ready", intent: "PRODUCT_CORRECTION", catalogue: { ...sampleCatalogue, stock_quantity: 10 }, missing_fields: [], clarification_questions: [] },
   },
   {
-    id: "list", group: "4. Manage drafts", label: "List catalogues", method: "GET", path: "/api/v1/catalogues", kind: "list",
+    id: "list", group: "5. Manage drafts", label: "List catalogues", method: "GET", path: "/api/v1/catalogues", kind: "list",
     description: "Lists saved drafts with pagination and a basic search across transcripts, identifiers and product names.",
     docs: "Use page and page_size for pagination. Search can match product names, transcripts, artisan IDs or session IDs.",
     request: [["page", "integer · query", "Page number, starting at 1."], ["page_size", "integer · query", "Items per page, 1–100."], ["search", "string · query", "Optional text filter, up to 100 characters."]],
@@ -174,7 +191,7 @@ const endpoints = [
 
 const guidedFields = ["product_name", "category", "materials", "craft_type", "colors", "dimensions", "price", "stock_quantity", "location", "is_handmade", "special_features", "care_instructions", "weight", "currency"];
 const languageOptions = ["hi", "en", "bn", "gu", "mr", "ta", "te", "kn", "ml", "pa", "or", "as", "ur"];
-const state = { selected: "from-text", view: "interactive", latestId: "", latestCatalogue: null, responses: {} };
+const state = { selected: "transcribe", view: "interactive", latestId: "", latestCatalogue: null, responses: {}, transcript: "", transcriptLanguage: "", recordedFile: null, recorder: null, stream: null, recordingTimer: null, previewUrl: null, previewAudio: null };
 const byId = (id) => document.getElementById(id);
 
 function create(tag, className, text) {
@@ -257,6 +274,28 @@ function makeInput(name, labelText, type, value = "", help = "", options = [], f
 
 function formNote(text) { return create("p", "form-note", text); }
 
+function recorderControls() {
+  const panel = create("div", "recorder-panel");
+  panel.append(create("p", "recorder-heading", "Microphone recording"));
+  const actions = create("div", "recorder-actions");
+  for (const [id, label, action] of [
+    ["recordButton", "● Record", startRecording],
+    ["stopButton", "■ Stop", stopRecording],
+    ["playButton", "▶ Play", playAudio],
+    ["transcribeButton", "Transcribe", () => sendRequest(endpoints.find((entry) => entry.id === "transcribe"))],
+  ]) {
+    const button = create("button", "recorder-button", label);
+    button.id = id;
+    button.type = "button";
+    button.addEventListener("click", action);
+    actions.append(button);
+  }
+  panel.append(actions, create("p", "recorder-status", "Choose an audio file or record using your microphone."));
+  panel.lastChild.id = "recorderStatus";
+  updateRecorderButtons(panel);
+  return panel;
+}
+
 function renderEditor(item) {
   const container = byId("requestEditor");
   container.replaceChildren();
@@ -295,11 +334,14 @@ function renderEditor(item) {
   if (item.kind === "audio") {
     grid.append(makeInput("audio", "Audio recording *", "file", "", "Mono WAV, FLAC or MP3; at most 10 MB and 60 seconds by default.", [], true));
     grid.append(makeInput("source_language", "Source language *", "select", "hi", "The language spoken in the recording.", languageOptions));
-    grid.append(makeInput("output_languages", "Output languages", "text", "hi,en", "Comma-separated language codes."));
-    grid.append(makeInput("artisan_id", "Artisan ID", "text", "", "Optional identifier from your app."));
-    grid.append(makeInput("session_id", "Session ID", "text", "", "Optional interview session identifier."));
-    grid.append(makeInput("idempotency_key", "X-Idempotency-Key", "text", "", "Optional retry key."));
-    grid.append(formNote("This endpoint calls Bhashini ASR and translation. Set BHASHINI_* values in voicebackend/.env first."));
+    grid.append(recorderControls());
+    if (item.id === "from-audio") {
+      grid.append(makeInput("output_languages", "Output languages", "text", "hi,en", "Comma-separated language codes."));
+      grid.append(makeInput("artisan_id", "Artisan ID", "text", "", "Optional identifier from your app."));
+      grid.append(makeInput("session_id", "Session ID", "text", "", "Optional interview session identifier."));
+      grid.append(makeInput("idempotency_key", "X-Idempotency-Key", "text", "", "Optional retry key."));
+    }
+    grid.append(formNote("Record creates a 16 kHz mono WAV in the browser. Transcribe returns text only; Send Request follows the selected endpoint. Live ASR needs BHASHINI_* credentials in voicebackend/.env."));
   } else if (item.kind === "guided") {
     grid.append(makeInput("catalogue_id", "Catalogue ID *", "text", state.latestId, "The latest created draft ID is filled automatically.", [], true));
     grid.append(makeInput("field", "Field to answer *", "select", "stock_quantity", "Choose one catalogue field.", guidedFields));
@@ -313,6 +355,15 @@ function renderEditor(item) {
     grid.append(makeInput("search", "Search", "text", "", "Optional product, transcript, artisan or session text.", [], true));
   }
   container.append(grid);
+  if (item.kind === "audio") {
+    byId("field-audio").addEventListener("change", () => {
+      state.recordedFile = null;
+      clearPreview();
+      setRecorderStatus(byId("field-audio").files.length ? `Selected ${byId("field-audio").files[0].name}. Ready to play or transcribe.` : "Choose an audio file or record using your microphone.");
+      updateRecorderButtons();
+    });
+    updateRecorderButtons();
+  }
   if (item.kind === "guided") {
     const file = byId("field-audio");
     const text = byId("field-text");
@@ -329,7 +380,155 @@ function setResponse(status, type, elapsed, content) {
   byId("liveResponse").textContent = content;
 }
 
+function setRecorderStatus(message) {
+  if (byId("recorderStatus")) byId("recorderStatus").textContent = message;
+}
+
+function selectedAudioFile() {
+  return state.recordedFile || byId("field-audio")?.files[0] || null;
+}
+
+function updateRecorderButtons(scope = document) {
+  const hasAudio = Boolean(state.recordedFile || byId("field-audio")?.files[0]);
+  const recording = Boolean(state.recorder && state.recorder.state === "recording");
+  const record = scope.querySelector("#recordButton");
+  const stop = scope.querySelector("#stopButton");
+  const play = scope.querySelector("#playButton");
+  const transcribe = scope.querySelector("#transcribeButton");
+  if (record) { record.disabled = recording; record.classList.toggle("recording", recording); }
+  if (stop) stop.disabled = !recording;
+  if (play) play.disabled = !hasAudio || recording;
+  if (transcribe) transcribe.disabled = !hasAudio || recording;
+}
+
+function clearPreview() {
+  if (state.previewAudio) { state.previewAudio.pause(); state.previewAudio = null; }
+  if (state.previewUrl) { URL.revokeObjectURL(state.previewUrl); state.previewUrl = null; }
+}
+
+function encodeWav(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const write = (offset, value) => { for (let i = 0; i < value.length; i += 1) view.setUint8(offset + i, value.charCodeAt(i)); };
+  write(0, "RIFF");
+  view.setUint32(4, buffer.byteLength - 8, true);
+  write(8, "WAVE");
+  write(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  write(36, "data");
+  view.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i += 1) {
+    const value = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(44 + i * 2, value < 0 ? value * 0x8000 : value * 0x7fff, true);
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+async function recordingToWav(blob) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass || !window.OfflineAudioContext) throw new Error("This browser cannot convert recordings to WAV. Upload a mono WAV file instead.");
+  const context = new AudioContextClass();
+  try {
+    const decoded = await context.decodeAudioData(await blob.arrayBuffer());
+    if (!decoded.duration) throw new Error("No audio was recorded. Try again.");
+    const rate = 16000;
+    const offline = new OfflineAudioContext(1, Math.ceil(decoded.duration * rate), rate);
+    const source = offline.createBufferSource();
+    source.buffer = decoded;
+    source.connect(offline.destination);
+    source.start();
+    const rendered = await offline.startRendering();
+    return new File([encodeWav(rendered.getChannelData(0), rate)], "recording.wav", { type: "audio/wav" });
+  } finally {
+    await context.close();
+  }
+}
+
+async function startRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    setRecorderStatus("Microphone recording needs a supported browser on localhost or HTTPS. You can upload audio instead.");
+    return;
+  }
+  const selectedAtStart = state.selected;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
+    if (state.selected !== selectedAtStart) { stream.getTracks().forEach((track) => track.stop()); return; }
+    state.stream = stream;
+    const mimeType = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"].find((type) => MediaRecorder.isTypeSupported(type));
+    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    const chunks = [];
+    recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      if (state.stream === stream) state.stream = null;
+      clearTimeout(state.recordingTimer);
+      state.recordingTimer = null;
+      if (state.recorder === recorder) state.recorder = null;
+      if (state.selected !== selectedAtStart) return;
+      setRecorderStatus("Preparing 16 kHz mono WAV…");
+      try {
+        if (!chunks.length) throw new Error("No audio was recorded. Try again.");
+        state.recordedFile = await recordingToWav(new Blob(chunks, { type: recorder.mimeType }));
+        if (state.selected !== selectedAtStart) return;
+        clearPreview();
+        byId("field-audio").value = "";
+        setRecorderStatus(`Recording ready (${(state.recordedFile.size / 1024).toFixed(0)} KB, 16 kHz mono WAV). Play it or transcribe it.`);
+      } catch (error) {
+        state.recordedFile = null;
+        setRecorderStatus(`Recording could not be prepared: ${error.message}`);
+      }
+      updateRecorderButtons();
+    };
+    state.recordedFile = null;
+    clearPreview();
+    byId("field-audio").value = "";
+    recorder.start(250);
+    state.recorder = recorder;
+    state.recordingTimer = setTimeout(stopRecording, 59000);
+    setRecorderStatus("Recording… Speak now, then click Stop. Recording stops automatically after 59 seconds.");
+    updateRecorderButtons();
+  } catch (error) {
+    if (state.stream) { state.stream.getTracks().forEach((track) => track.stop()); state.stream = null; }
+    setRecorderStatus(`Microphone unavailable: ${error.message}. You can upload an audio file instead.`);
+    updateRecorderButtons();
+  }
+}
+
+function stopRecording() {
+  if (state.recorder?.state === "recording") {
+    state.recorder.stop();
+    setRecorderStatus("Finishing recording…");
+    updateRecorderButtons();
+  }
+}
+
+async function playAudio() {
+  const file = selectedAudioFile();
+  if (!file) { setRecorderStatus("Choose or record audio first."); return; }
+  clearPreview();
+  state.previewUrl = URL.createObjectURL(file);
+  state.previewAudio = new Audio(state.previewUrl);
+  state.previewAudio.addEventListener("ended", () => setRecorderStatus("Playback finished. Ready to transcribe."));
+  try { await state.previewAudio.play(); setRecorderStatus(`Playing ${file.name}…`); }
+  catch (error) { setRecorderStatus(`Playback failed: ${error.message}`); }
+}
+
+function showTranscript(transcript, sourceLanguage) {
+  state.transcript = transcript;
+  state.transcriptLanguage = sourceLanguage;
+  byId("transcriptText").textContent = transcript;
+  byId("transcriptLanguage").textContent = `Source language: ${sourceLanguage}`;
+  byId("transcriptPanel").hidden = false;
+}
+
 function selectEndpoint(id) {
+  if (state.recorder?.state === "recording") state.recorder.stop();
   state.selected = id;
   history.replaceState(null, "", `#${id}`);
   const item = endpoint();
@@ -345,6 +544,8 @@ function selectEndpoint(id) {
   renderFieldTable("requestFields", item.request);
   renderFieldTable("responseFields", item.response);
   renderEditor(item);
+  if (item.kind === "audio" && state.recordedFile) setRecorderStatus(`Recording ready: ${state.recordedFile.name}. Play it or transcribe it.`);
+  byId("transcriptPanel").hidden = !state.transcript;
   renderNavigation();
   if (state.responses[id]) {
     const previous = state.responses[id];
@@ -412,13 +613,15 @@ function buildRequest(item) {
   if (item.kind === "audio" || item.kind === "guided") {
     const form = new FormData();
     if (item.kind === "audio") {
-      const file = byId("field-audio").files[0];
+      const file = selectedAudioFile();
       if (!file) throw new Error("Choose an audio recording before sending.");
       form.append("audio", file);
       form.append("source_language", fieldValue("source_language"));
-      form.append("output_languages", fieldValue("output_languages") || "hi,en");
-      for (const name of ["artisan_id", "session_id"]) if (fieldValue(name)) form.append(name, fieldValue(name));
-      if (fieldValue("idempotency_key")) options.headers["X-Idempotency-Key"] = fieldValue("idempotency_key");
+      if (item.id === "from-audio") {
+        form.append("output_languages", fieldValue("output_languages") || "hi,en");
+        for (const name of ["artisan_id", "session_id"]) if (fieldValue(name)) form.append(name, fieldValue(name));
+        if (fieldValue("idempotency_key")) options.headers["X-Idempotency-Key"] = fieldValue("idempotency_key");
+      }
     } else {
       const id = fieldValue("catalogue_id");
       const text = fieldValue("text");
@@ -435,14 +638,16 @@ function buildRequest(item) {
   return { url, options };
 }
 
-async function sendRequest() {
-  const item = endpoint();
+async function sendRequest(overrideItem = null) {
+  const item = overrideItem || endpoint();
   let request;
   try { request = buildRequest(item); }
   catch (error) { setResponse("Input error", "error", "0 ms", error.message); return; }
   const button = byId("sendButton");
   button.disabled = true;
+  if (byId("transcribeButton")) byId("transcribeButton").disabled = true;
   byId("sendLabel").textContent = "Sending...";
+  byId("responsePath").textContent = request.url;
   setResponse("Sending", "loading", "…", `Calling ${item.method} ${request.url}…`);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 120000);
@@ -458,6 +663,10 @@ async function sendRequest() {
     const type = response.ok ? "success" : "error";
     setResponse(status, type, elapsed, content);
     state.responses[item.id] = { status, type, elapsed, content };
+    if (response.ok && body && typeof body === "object") {
+      if (typeof body.transcript === "string") showTranscript(body.transcript, body.source_language);
+      else if (typeof body.original_transcript === "string") showTranscript(body.original_transcript, body.source_language);
+    }
     if (response.ok && body && typeof body === "object" && body.catalogue_id) {
       state.latestId = body.catalogue_id;
       state.latestCatalogue = body.catalogue || null;
@@ -470,13 +679,24 @@ async function sendRequest() {
   } finally {
     clearTimeout(timer);
     button.disabled = false;
+    updateRecorderButtons();
     byId("sendLabel").textContent = "Send Request";
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   byId("endpointSearch").addEventListener("input", renderNavigation);
-  byId("sendButton").addEventListener("click", sendRequest);
+  byId("sendButton").addEventListener("click", () => sendRequest());
+  byId("useTranscriptButton").addEventListener("click", () => {
+    if (!state.transcript) return;
+    selectEndpoint("from-text");
+    const payload = JSON.parse(byId("payloadJson").value);
+    payload.text = state.transcript;
+    payload.source_language = state.transcriptLanguage;
+    byId("payloadJson").value = JSON.stringify(payload, null, 2);
+    byId("payloadJson").focus();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
   document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => setView(tab.dataset.view)));
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && state.view === "interactive") {

@@ -93,6 +93,15 @@ class RejectedResponse(BaseModel):
     message: str
 
 
+class TranscriptionResponse(BaseModel):
+    request_id: str
+    source_language: str
+    transcript: str
+    audio_format: str
+    sampling_rate_hz: int
+    asr_provider: Literal["Bhashini"] = "Bhashini"
+
+
 class TextRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     text: str = Field(min_length=1, max_length=10000)

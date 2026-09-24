@@ -12,7 +12,7 @@ mobile/web client -> FastAPI -> audio validation -> Bhashini ASR
                                  -> SQLAlchemy draft -> JSON response
 ```
 
-`app/api` contains HTTP routes, `app/bhashini` the reusable ULCA pipeline client, `app/catalogue` the rules and editable vocabulary, `app/services` the workflow, `app/repositories.py` persistence operations, `app/models.py` SQLAlchemy tables, `app/schemas.py` Pydantic contracts, `app/validators.py` audio checks, and `tests` the mocked tests. Configuration is in `app/config.py` and `.env.example`.
+`app/api` contains HTTP routes, `app/bhashini` the reusable ULCA pipeline client, `app/catalogue` the rules and editable vocabulary, `app/services` the workflow, `app/repositories.py` persistence operations, `app/models.py` SQLAlchemy tables, `app/schemas.py` Pydantic contracts, `app/validators.py` audio checks, and `tests` the mocked tests. Configuration is in `app/config.py` and `.env.example`. The standalone transcription route ends after ASR; it does not translate, extract fields, or save a draft.
 
 The Bhashini adapter makes a Pipeline Config call, selects a service for the requested language pair, then makes a Pipeline Compute call using the returned inference key. The configured service IDs are preferred when available; a pipeline-supported service is selected otherwise. This follows the [official pipeline flow](https://dibd-bhashini.gitbook.io/bhashini-apis/pipeline-config-call) and [response contract](https://bhashini.gitbook.io/bhashini-apis/pipeline-config-call/response-payload). ASR and translations are separate calls to keep error handling and normalization simple.
 
@@ -29,7 +29,7 @@ cp .env.example .env             # Windows PowerShell: Copy-Item .env.example .e
 python -m uvicorn app.main:app --reload
 ```
 
-The API runs at `http://127.0.0.1:8000`. Open the [interactive API tester](http://127.0.0.1:8000/tester) to choose an endpoint, edit its request, send it to the local service, and compare the live response with a clearly labelled example. It also explains request and response fields for each operation. FastAPI OpenAPI docs are at `/docs`, the raw schema at `/openapi.json`, and `/health` confirms the process is running. Configure credentials before trying translation or audio requests. Health, language listing, draft reads and validation do not need Bhashini credentials.
+The API runs at `http://127.0.0.1:8000`. Open the [interactive API tester](http://127.0.0.1:8000/tester) to choose an endpoint, edit its request, send it to the local service, and compare the live response with a clearly labelled example. It also explains request and response fields for each operation. Select **Transcribe audio** to upload a file or use **Record → Stop → Play → Transcribe**. The browser converts a microphone recording to 16 kHz mono WAV. After ASR succeeds, the transcript appears above the live JSON response; **Use transcript to create catalogue** fills the text workflow. Microphone access requires browser permission and localhost or HTTPS. FastAPI OpenAPI docs are at `/docs`, the raw schema at `/openapi.json`, and `/health` confirms the process is running. Configure credentials before trying translation or audio requests. Health, language listing, draft reads and validation do not need Bhashini credentials.
 
 ### Bhashini credentials
 
@@ -52,6 +52,7 @@ The Docker image uses SQLite in a persistent volume. For PostgreSQL, install a P
 | --- | --- | --- |
 | GET | `/health` | Liveness |
 | GET | `/api/v1/languages` | Candidate language codes |
+| POST | `/api/v1/transcriptions/from-audio` | Bhashini ASR transcript only; no catalogue draft |
 | POST | `/api/v1/catalogues/from-audio` | Upload WAV, FLAC or MP3 and create a draft |
 | POST | `/api/v1/catalogues/from-text` | Create a draft from a transcript |
 | POST | `/api/v1/catalogues/guided-answer` | Record one answer for one existing draft field |
@@ -60,7 +61,7 @@ The Docker image uses SQLite in a persistent volume. For PostgreSQL, install a P
 | PUT | `/api/v1/catalogues/{catalogue_id}` | Replace editable catalogue fields |
 | GET | `/api/v1/catalogues` | List with `page`, `page_size`, and `search` |
 
-`from-audio` uses multipart fields `audio`, `source_language`, `output_languages` (comma-separated, default `hi,en`), optional `artisan_id`, and optional `session_id`. Uploads must be mono WAV, FLAC or MP3, 8–48 kHz, and at most 60 seconds by default. `guided-answer` uses multipart fields `catalogue_id`, `field`, `source_language`, and either `text` or `audio`. The 12 guided fields are `product_name`, `category`, `materials`, `craft_type`, `colors`, `dimensions`, `price`, `stock_quantity`, `location`, `is_handmade`, `special_features`, and `care_instructions`. `weight` and `currency` answers are also supported. Each audio answer goes through Bhashini ASR. `from-text` accepts JSON with `text`, `source_language`, `output_languages`, `artisan_id`, and `session_id`. Supported candidate codes: `as`, `bn`, `en`, `gu`, `hi`, `kn`, `ml`, `mr`, `or`, `pa`, `ta`, `te`, `ur`.
+`transcriptions/from-audio` accepts multipart fields `audio` and `source_language`. It returns `request_id`, `source_language`, `transcript`, `audio_format`, `sampling_rate_hz`, and `asr_provider`; it does not create a catalogue or retain the audio. `catalogues/from-audio` also accepts `output_languages` (comma-separated, default `hi,en`), optional `artisan_id`, and optional `session_id`. Uploads must be mono WAV, FLAC or MP3, 8–48 kHz, and at most 60 seconds by default. `guided-answer` uses multipart fields `catalogue_id`, `field`, `source_language`, and either `text` or `audio`. The 12 guided fields are `product_name`, `category`, `materials`, `craft_type`, `colors`, `dimensions`, `price`, `stock_quantity`, `location`, `is_handmade`, `special_features`, and `care_instructions`. `weight` and `currency` answers are also supported. Each audio answer goes through Bhashini ASR. `from-text` accepts JSON with `text`, `source_language`, `output_languages`, `artisan_id`, and `session_id`. Supported candidate codes: `as`, `bn`, `en`, `gu`, `hi`, `kn`, `ml`, `mr`, `or`, `pa`, `ta`, `te`, `ur`.
 
 For creation calls, send `X-Idempotency-Key` to safely retry the same request. A repeated key with different input returns HTTP 409. All responses include an `X-Request-ID` header, and successful drafts include `request_id` in JSON. A draft status is `needs_clarification` or `draft_ready`; off-topic content returns `rejected` without a catalogue ID or an answer to the question.
 
@@ -74,6 +75,9 @@ curl -X POST http://127.0.0.1:8000/api/v1/catalogues/from-text \
 curl -X POST http://127.0.0.1:8000/api/v1/catalogues/from-audio \
   -F 'audio=@sample.wav;type=audio/wav' -F 'source_language=hi' \
   -F 'output_languages=hi,en' -F 'session_id=demo-session'
+
+curl -X POST http://127.0.0.1:8000/api/v1/transcriptions/from-audio \
+  -F 'audio=@sample.wav;type=audio/wav' -F 'source_language=hi'
 
 curl -X POST http://127.0.0.1:8000/api/v1/catalogues/guided-answer \
   -F 'catalogue_id=YOUR_UUID' -F 'field=stock_quantity' \

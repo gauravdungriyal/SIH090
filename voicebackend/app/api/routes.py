@@ -35,6 +35,7 @@ from app.schemas import (
     ListResponse,
     RejectedResponse,
     TextRequest,
+    TranscriptionResponse,
     ValidationRequest,
     ValidationResponse,
 )
@@ -78,6 +79,31 @@ def languages():
         "languages": [{"code": code, "name": name} for code, name in LANGUAGES.items()],
         "note": "Actual ASR and translation support depends on the configured Bhashini pipeline.",
     }
+
+
+@router.post("/api/v1/transcriptions/from-audio", response_model=TranscriptionResponse)
+async def transcribe_audio(
+    request: Request,
+    audio: UploadFile = File(...),
+    source_language: str = Form(...),
+    bhashini: BhashiniClient = Depends(get_bhashini),
+    settings: Settings = Depends(get_settings),
+):
+    check_language(source_language)
+    data, audio_format, rate = await validate_audio(audio, settings)
+    transcript = bhashini.transcribe_audio(data, source_language, audio_format, rate)
+    if not transcript or not transcript.strip():
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "empty_transcript", "message": "No speech was recognized"},
+        )
+    return TranscriptionResponse(
+        request_id=request.state.request_id,
+        source_language=source_language,
+        transcript=transcript.strip(),
+        audio_format=audio_format,
+        sampling_rate_hz=rate,
+    )
 
 
 @router.post("/api/v1/catalogues/from-text", response_model=CatalogueResponse | RejectedResponse)

@@ -97,6 +97,19 @@ h1 span { color: var(--blue); }
 .form-control[type=file]::file-selector-button { margin-right: 12px; border: 0; border-radius: 5px; padding: 6px 9px; background: #edf4ff; color: #176de5; font-size: 12px; font-weight: 800; cursor: pointer; }
 textarea.form-control { min-height: 82px; resize: vertical; }
 .form-note { grid-column: 1 / -1; margin: 1px 0 0; color: #7786a0; font-size: 11px; line-height: 1.45; }
+.recorder-panel { grid-column: 1 / -1; padding: 15px; border: 1px solid #dce8fa; border-radius: 9px; background: #f6faff; }
+.recorder-heading { margin: 0 0 10px; color: #40506e; font-size: 12px; font-weight: 800; }
+.recorder-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.recorder-button, .secondary-button { padding: 8px 12px; border: 1px solid #cbdcf7; border-radius: 7px; background: #fff; color: #1769e8; font-size: 12px; font-weight: 800; }
+.recorder-button:hover, .secondary-button:hover { background: #eaf3ff; }
+.recorder-button:disabled { opacity: .45; cursor: not-allowed; }
+.recorder-button.recording { border-color: #f1b0b0; color: #be4545; background: #fff5f4; }
+.recorder-status { margin: 9px 0 0; color: #687a98; font-size: 12px; line-height: 1.4; }
+.transcript-panel { margin: 0 0 24px; padding: 20px; border: 1px solid #b8d5ff; border-radius: 10px; background: #f4f9ff; }
+.transcript-panel[hidden] { display: none; }
+.transcript-topline { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.transcript-language { color: #5e759b; font-size: 12px; font-weight: 700; }
+.transcript-text { margin: 10px 0 16px; color: #1f3151; font-size: 19px; font-weight: 700; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .response-heading { margin-top: 3px; }
 .response-meta { display: flex; align-items: center; gap: 10px; white-space: nowrap; }
 .status-pill { display: inline-block; border-radius: 7px; padding: 5px 9px; font-size: 11px; font-weight: 800; }
